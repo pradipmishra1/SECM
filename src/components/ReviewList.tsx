@@ -1,0 +1,398 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import TiltCard from "./TiltCard";
+import { Icon } from "./icons";
+
+function getFileMeta(url: string) {
+  const clean = url.split("?")[0];
+  const ext = clean.split(".").pop()?.toLowerCase() || "";
+  const name = decodeURIComponent(clean.split("/").pop() || "submission file");
+  const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext);
+  const isPdf = ext === "pdf";
+  const isZip = ["zip", "rar", "7z"].includes(ext);
+  const icon = isImage ? "🖼️" : isPdf ? "📄" : isZip ? "🗂️" : "📎";
+  return { name, ext: ext.toUpperCase() || "FILE", icon };
+}
+
+function SubmissionFilesModal({ submission, onClose }: { submission: any; onClose: () => void }) {
+  const submitterName = submission.user ? submission.user.name : submission.team ? submission.team.name : "Unknown";
+  const files = submission.fileUrl ? [submission.fileUrl] : [];
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(20,19,43,0.5)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, animation: "sfmFadeBg 0.2s ease",
+      }}
+    >
+      <style>{`
+        @keyframes sfmFadeBg { from { opacity:0 } to { opacity:1 } }
+        @keyframes sfmPop { from { opacity:0; transform: scale(0.94) translateY(10px); } to { opacity:1; transform: scale(1) translateY(0); } }
+        .sfm-card { transition: transform 0.2s cubic-bezier(.34,1.56,.64,1), box-shadow 0.25s ease; }
+        .sfm-card:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(109,74,255,0.35); }
+        .sfm-shine { position: absolute; inset: 0; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%); animation: sfmShine 3.5s ease-in-out infinite; }
+        @keyframes sfmShine { 0% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+        .sfm-open-btn { transition: transform 0.15s ease, box-shadow 0.2s ease; }
+        .sfm-open-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(109,74,255,0.3); }
+      `}</style>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff", borderRadius: 24, padding: 28, width: 440, animation: "sfmPop 0.3s cubic-bezier(.2,.8,.2,1)",
+          boxShadow: "0 30px 60px rgba(20,19,43,0.25)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+          <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 17, fontWeight: 700, color: "#14132B" }}>Submitted Files</h3>
+          <button onClick={onClose} style={{ background: "rgba(20,19,43,0.05)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: 15, color: "rgba(20,19,43,0.5)" }}>✕</button>
+        </div>
+
+        {files.length === 0 ? (
+          <p style={{ fontSize: 13, color: "rgba(20,19,43,0.4)", textAlign: "center", padding: "30px 0" }}>No files attached.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {files.map((url, i) => {
+              const meta = getFileMeta(url);
+              return (
+                <div
+                  key={i}
+                  className="sfm-card"
+                  style={{
+                    position: "relative",
+                    overflow: "hidden",
+                    borderRadius: 18,
+                    padding: 22,
+                    background: "linear-gradient(135deg, #14132B 0%, #3B2E7A 55%, #6D4AFF 100%)",
+                    color: "#fff",
+                  }}
+                >
+                  <div className="sfm-shine" />
+                  <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 26 }}>
+                    <span style={{ fontSize: 26 }}>{meta.icon}</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, opacity: 0.7, background: "rgba(255,255,255,0.15)", padding: "4px 10px", borderRadius: 20 }}>
+                      {meta.ext}
+                    </span>
+                  </div>
+                  <div style={{ position: "relative" }}>
+                    <p style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 4, wordBreak: "break-word" }}>{meta.name}</p>
+                    <p style={{ fontSize: 11.5, opacity: 0.65 }}>Submitted by {submitterName}</p>
+                  </div>
+                  
+                    <a href={url} target="_blank" rel="noreferrer" className="sfm-open-btn" style={{ position: "relative", marginTop: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "#fff", color: "#14132B", textDecoration: "none", borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 700 }}>Open File <Icon.arrow width={13} height={13} /></a>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function ReviewList({
+  challenges,
+  selectedChallengeId,
+  submissions,
+}: {
+  challenges: { id: string; title: string }[];
+  selectedChallengeId: string;
+  submissions: any[];
+}) {
+  const router = useRouter();
+  const [scores, setScores] = useState<Record<string, string>>({});
+  const [criterionInputs, setCriterionInputs] = useState<Record<string, Record<string, string>>>({});
+  const [feedbacks, setFeedbacks] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [rubric, setRubric] = useState<any[]>([]);
+  const [rubricLoading, setRubricLoading] = useState(true);
+  const [viewingSubmission, setViewingSubmission] = useState<any>(null);
+
+  useEffect(() => {
+    if (!selectedChallengeId) return;
+    setRubricLoading(true);
+    fetch(`/api/challenges/${selectedChallengeId}/rubric`)
+      .then((r) => r.json())
+      .then((d) => {
+        setRubric(d.criteria || []);
+        setRubricLoading(false);
+      });
+  }, [selectedChallengeId]);
+
+  function changeChallenge(id: string) {
+    router.push("/dashboard/review?challenge=" + id);
+  }
+
+  function setCriterionScore(submissionId: string, criterionId: string, value: string) {
+    setCriterionInputs((prev) => ({
+      ...prev,
+      [submissionId]: { ...(prev[submissionId] || {}), [criterionId]: value },
+    }));
+  }
+
+  async function saveReview(submissionId: string) {
+    setError("");
+
+    let body: any = { feedback: feedbacks[submissionId] || "" };
+
+    if (rubric.length > 0) {
+      const inputs = criterionInputs[submissionId] || {};
+      const criterionScores = rubric.map((c) => ({
+        criterionId: c.id,
+        score: parseInt(inputs[c.id] || "0"),
+      }));
+      if (criterionScores.some((cs) => isNaN(cs.score))) {
+        setError("Fill in all criterion scores");
+        return;
+      }
+      body.criterionScores = criterionScores;
+    } else {
+      const score = scores[submissionId];
+      if (score === undefined || score === "") {
+        setError("Enter a score first");
+        return;
+      }
+      const num = parseInt(score);
+      if (num < 0 || num > 10) {
+        setError("Score must be between 0 and 10");
+        return;
+      }
+      body.score = num;
+    }
+
+    setSavingId(submissionId);
+    const res = await fetch("/api/submissions/" + submissionId + "/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    setSavingId(null);
+
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error || "Failed to save review");
+      return;
+    }
+
+    router.refresh();
+  }
+
+  const scoreInputStyle: React.CSSProperties = {
+    padding: "9px 12px",
+    borderRadius: 10,
+    border: "1px solid rgba(109,74,255,0.15)",
+    background: "rgba(109,74,255,0.05)",
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#4C2FCC",
+    outline: "none",
+    boxSizing: "border-box",
+  };
+
+  const feedbackInputStyle: React.CSSProperties = {
+    padding: "9px 12px",
+    borderRadius: 10,
+    border: "1px solid rgba(37,99,235,0.12)",
+    background: "rgba(37,99,235,0.04)",
+    fontSize: 13,
+    color: "#1E3A8A",
+    outline: "none",
+    boxSizing: "border-box",
+  };
+
+  return (
+    <div>
+      <style>{`
+        @keyframes rlRise { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform: translateY(0); } }
+        .rl-anim { animation: rlRise 0.4s cubic-bezier(.2,.8,.2,1) both; }
+        .tab-pill { transition: transform 0.15s ease; }
+        .tab-pill:hover { transform: translateY(-1px); }
+        .rl-score-input:focus { border-color: rgba(109,74,255,0.4) !important; box-shadow: 0 0 0 3px rgba(109,74,255,0.1); background: #fff !important; }
+        .rl-feedback-input:focus { border-color: rgba(37,99,235,0.35) !important; box-shadow: 0 0 0 3px rgba(37,99,235,0.08); background: #fff !important; }
+        .rl-save-btn { transition: transform 0.15s ease, box-shadow 0.2s ease; }
+        .rl-save-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(20,19,43,0.2); }
+        .rl-link { transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 4px; }
+        .rl-link:hover { gap: 7px; background: rgba(109,74,255,0.06) !important; }
+      `}</style>
+
+      <div style={{ marginBottom: 20, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {challenges.map(function (c) {
+          const isActive = c.id === selectedChallengeId;
+          return (
+            <button
+              key={c.id}
+              className="tab-pill"
+              onClick={function () { changeChallenge(c.id); }}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 20,
+                border: "none",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                background: isActive ? "linear-gradient(135deg,#6D4AFF,#8B5CF6)" : "rgba(20,19,43,0.05)",
+                color: isActive ? "#fff" : "rgba(20,19,43,0.6)",
+              }}
+            >
+              {c.title}
+            </button>
+          );
+        })}
+      </div>
+
+      {rubric.length > 0 && !rubricLoading && (
+        <div style={{ background: "rgba(109,74,255,0.06)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "#6D4AFF", fontWeight: 600 }}>
+          This challenge uses rubric scoring: {rubric.map((c: any) => c.name).join(", ")}
+        </div>
+      )}
+
+      {error ? (
+        <div style={{ background: "rgba(255,70,70,0.05)", border: "1px solid rgba(255,70,70,0.15)", borderRadius: 10, padding: "10px 14px", color: "#d32f2f", fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      ) : null}
+
+      {submissions.length === 0 ? (
+        <div style={{ background: "#fff", borderRadius: 18, border: "1px solid rgba(15,23,42,0.07)", padding: 50, textAlign: "center" }}>
+          <div style={{ fontSize: 36, marginBottom: 10, opacity: 0.25 }}>📭</div>
+          <p style={{ color: "rgba(20,19,43,0.4)", fontSize: 14 }}>No submissions for this challenge yet.</p>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 18 }}>
+          {submissions.map(function (s, i) {
+            const submitterName = s.user ? s.user.name : (s.team ? s.team.name : "Unknown");
+            const alreadyScored = !!s.review;
+
+            return (
+              <div key={s.id} className="rl-anim" style={{ animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
+                <TiltCard
+                  intensity={2}
+                  glow="rgba(109,74,255,0.08)"
+                  style={{
+                    background: "#fff",
+                    borderRadius: 18,
+                    border: alreadyScored ? "1px solid rgba(22,163,74,0.15)" : "1px solid rgba(15,23,42,0.07)",
+                    padding: 20,
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}>
+                          {submitterName[0]?.toUpperCase()}
+                        </div>
+                        <div style={{ fontSize: 14.5, fontWeight: 700, color: "#14132B" }}>{submitterName}</div>
+                      </div>
+                      <button
+                        onClick={() => setViewingSubmission(s)}
+                        className="rl-link"
+                        style={{ fontSize: 12, color: "#6D4AFF", marginTop: 6, fontWeight: 600, background: "none", border: "none", padding: "3px 6px", borderRadius: 8, cursor: "pointer" }}
+                      >
+                        View submission <Icon.arrow width={10} height={10} />
+                      </button>
+                    </div>
+                    {alreadyScored ? (
+                      <span style={{ fontSize: 11.5, fontWeight: 700, padding: "4px 10px", borderRadius: 20, background: "rgba(22,163,74,0.1)", color: "#15803D", whiteSpace: "nowrap" }}>
+                        {"✓ " + s.review.score + "/10"}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, background: "rgba(245,158,11,0.1)", color: "#B45309", whiteSpace: "nowrap" }}>
+                        Pending
+                      </span>
+                    )}
+                  </div>
+
+                  {s.description ? (
+                    <p style={{ fontSize: 12.5, color: "rgba(20,19,43,0.6)", marginBottom: 14, lineHeight: 1.5, background: "#F6F5FB", padding: "10px 12px", borderRadius: 10 }}>
+                      {s.description}
+                    </p>
+                  ) : null}
+
+                  <div style={{ marginTop: "auto", paddingTop: 12, borderTop: "1px solid rgba(15,23,42,0.06)", display: "flex", flexDirection: "column", gap: 10 }}>
+                    {rubric.length > 0 ? (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
+                        {rubric.map((c: any) => (
+                          <div key={c.id}>
+                            <label style={{ fontSize: 10.5, fontWeight: 600, color: "rgba(20,19,43,0.5)", display: "block", marginBottom: 4 }}>
+                              {c.name} (/{c.maxScore})
+                            </label>
+                            <input
+                              type="number"
+                              className="rl-score-input"
+                              min={0}
+                              max={c.maxScore}
+                              value={criterionInputs[s.id]?.[c.id] ?? ""}
+                              onChange={(e) => setCriterionScore(s.id, c.id, e.target.value)}
+                              style={{ ...scoreInputStyle, width: "100%" }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <input
+                        type="number"
+                        className="rl-score-input"
+                        min={0}
+                        max={10}
+                        placeholder={alreadyScored ? String(s.review.score) : "Score /10"}
+                        value={scores[s.id] !== undefined ? scores[s.id] : ""}
+                        onChange={function (e) {
+                          const next = Object.assign({}, scores);
+                          next[s.id] = e.target.value;
+                          setScores(next);
+                        }}
+                        style={{ ...scoreInputStyle, width: 100 }}
+                      />
+                    )}
+
+                    <input
+                      type="text"
+                      className="rl-feedback-input"
+                      placeholder={alreadyScored ? (s.review.feedback || "Feedback") : "Feedback (optional)"}
+                      value={feedbacks[s.id] !== undefined ? feedbacks[s.id] : ""}
+                      onChange={function (e) {
+                        const next = Object.assign({}, feedbacks);
+                        next[s.id] = e.target.value;
+                        setFeedbacks(next);
+                      }}
+                      style={feedbackInputStyle}
+                    />
+
+                    <button
+                      className="rl-save-btn"
+                      onClick={function () { saveReview(s.id); }}
+                      disabled={savingId === s.id}
+                      style={{
+                        background: "#14132B",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 10,
+                        padding: "10px 0",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        opacity: savingId === s.id ? 0.6 : 1,
+                      }}
+                    >
+                      {savingId === s.id ? "Saving..." : alreadyScored ? "Update Score" : "Save Score"}
+                    </button>
+                  </div>
+                </TiltCard>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {viewingSubmission && (
+        <SubmissionFilesModal submission={viewingSubmission} onClose={() => setViewingSubmission(null)} />
+      )}
+    </div>
+  );
+}
