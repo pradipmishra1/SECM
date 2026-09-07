@@ -6,6 +6,7 @@ import AdminProfile from "@/components/AdminProfile";
 import DashboardLayout from 
 "@/components/DashboardLayout";
 import ProfileEditor from "@/components/ProfileEditor";
+import { parsePrizeAmount } from "@/lib/prizeMoney";
 
 export default async function ProfilePage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -16,10 +17,15 @@ export default async function ProfilePage() {
   const fullUser = await prisma.user.findUnique({ where: { id: user.id }, select: { image: true } });
   const organizerProfile = user.role === "ORGANIZER" ? await prisma.organizerProfile.findUnique({ where: { userId: user.id } }) : null;
 
-  let stats: any = { wins: 0, submissions: 0, challengesJoined: 0, teamsCount: 0 };
+   let stats: any = { wins: 0, submissions: 0, challengesJoined: 0, teamsCount: 0 };
   let teams: any[] = [];
   let recentActivity: any[] = [];
   let recentChallenges: any[] = [];
+
+  const [followerCount, followingCount] = await Promise.all([
+    prisma.follow.count({ where: { followingId: user.id } }),
+    prisma.follow.count({ where: { followerId: user.id } }),
+  ]);
 
   if (user.role === "STUDENT") {
     const myTeams = await prisma.team.findMany({
@@ -28,15 +34,24 @@ export default async function ProfilePage() {
     });
     const myTeamIds = myTeams.map((t) => t.id);
 
-    const allWins = await prisma.winner.findMany({ where: { submission: { OR: [{ userId: user.id }, { teamId: { in: myTeamIds } }] } } });
+       const allWins = await prisma.winner.findMany({
+      where: { submission: { OR: [{ userId: user.id }, { teamId: { in: myTeamIds } }] } },
+      include: { challenge: { select: { prizeFirst: true, prizeSecond: true, prizeThird: true } } },
+    });
     const winsCount = allWins.length;
     const firstPlaceCount = allWins.filter((w) => w.position === 1).length;
     const secondPlaceCount = allWins.filter((w) => w.position === 2).length;
     const thirdPlaceCount = allWins.filter((w) => w.position === 3).length;
+
+    const totalWinnings = allWins.reduce((sum, w) => {
+      const prizeStr = w.position === 1 ? w.challenge.prizeFirst : w.position === 2 ? w.challenge.prizeSecond : w.challenge.prizeThird;
+      return sum + parsePrizeAmount(prizeStr);
+    }, 0);
+
     const submissionsCount = await prisma.submission.count({ where: { OR: [{ userId: user.id }, { teamId: { in: myTeamIds } }] } });
     const challengesJoined = await prisma.participation.count({ where: { userId: user.id } });
 
-    stats = { wins: winsCount, submissions: submissionsCount, challengesJoined, teamsCount: myTeams.length, firstPlaceCount, secondPlaceCount, thirdPlaceCount };
+       stats = { wins: winsCount, submissions: submissionsCount, challengesJoined, teamsCount: myTeams.length, firstPlaceCount, secondPlaceCount, thirdPlaceCount, followerCount, followingCount, totalWinnings };
     teams = myTeams;
 
     const recentSubs = await prisma.submission.findMany({
@@ -74,25 +89,27 @@ export default async function ProfilePage() {
       }),
     ]);
 
-    stats = {
+        stats = {
       totalChallenges,
       activeChallenges,
       totalSubmissions,
       totalParticipations,
+      followerCount,
+      followingCount,
     };
     recentChallenges = myChallenges;
   }
 
- if (user.role === "ADMIN") {
+  if (user.role === "ADMIN") {
     return (
-      <DashboardLayout role={user.role} userName={user.name}>
+      <DashboardLayout role={user.role} userName={user.name} emailVerified={user.emailVerified} userEmail={user.email}>
         <AdminProfile user={{ name: user.name, email: user.email, username: user.username, image: fullUser?.image || null }} />
       </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout role={user.role} userName={user.name}>
+    <DashboardLayout role={user.role} userName={user.name} emailVerified={user.emailVerified} userEmail={user.email}>
       <ProfileEditor
         user={{ name: user.name, email: user.email, username: user.username, image: fullUser?.image || null }}
         role={user.role}

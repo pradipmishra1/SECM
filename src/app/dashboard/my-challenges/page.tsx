@@ -28,12 +28,30 @@ export default async function MyChallengesPage() {
           orderBy: { createdAt: "desc" },
         })
       : [];
+
+
   } else {
-    const rawChallenges = await prisma.challenge.findMany({
-      where: { status: "PUBLISHED" },
-      include: { organizer: true, teams: true },
-      orderBy: { deadline: "asc" },
-    });
+    const myBookmarkIds = (
+      await prisma.bookmark.findMany({ where: { userId: user.id }, select: { challengeId: true } })
+    ).map((b) => b.challengeId);
+
+    const [rawChallenges, myParticipations, myTeamsPerChallenge] = await Promise.all([
+      prisma.challenge.findMany({
+        where: {
+          OR: [{ status: "PUBLISHED" }, { id: { in: myBookmarkIds } }],
+        },
+        include: { organizer: true, teams: true },
+        orderBy: { deadline: "asc" },
+      }),
+      prisma.participation.findMany({
+        where: { userId: user.id },
+        select: { challengeId: true },
+      }),
+      prisma.team.findMany({
+        where: { members: { some: { userId: user.id } } },
+        select: { id: true, name: true, challengeId: true },
+      }),
+    ]);
 
     organizersWithChallenges = Array.from(
       new Map(
@@ -43,29 +61,15 @@ export default async function MyChallengesPage() {
         ])
       ).values()
     );
-
-    const myParticipations = await prisma.participation.findMany({
-      where: { userId: user.id },
-      select: { challengeId: true },
-    });
     joinedIds = myParticipations.map((p) => p.challengeId);
-
-    const myTeamIds = (
-      await prisma.team.findMany({ where: { members: { some: { userId: user.id } } }, select: { id: true } })
-    ).map((t) => t.id);
+    const myTeamIds = myTeamsPerChallenge.map((t) => t.id);
 
     const mySubmissions = await prisma.submission.findMany({
       where: { OR: [{ userId: user.id }, { teamId: { in: myTeamIds } }] },
       select: { challengeId: true },
     });
     const submittedIds = new Set(mySubmissions.map((s) => s.challengeId));
-
-    const myTeamsPerChallenge = await prisma.team.findMany({
-      where: { members: { some: { userId: user.id } } },
-      select: { id: true, name: true, challengeId: true },
-    });
     const teamByChallengeId = new Map(myTeamsPerChallenge.map((t) => [t.challengeId, t]));
-
     challenges = rawChallenges.map((c: any) => ({
       ...c,
       hasSubmitted: submittedIds.has(c.id),

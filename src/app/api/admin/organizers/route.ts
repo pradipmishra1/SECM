@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const organizers = await prisma.organizerProfile.findMany({
     include: {
-      user: { select: { id: true, name: true, email: true, username: true, createdAt: true } },
+            user: { select: { id: true, name: true, email: true, username: true, image: true, createdAt: true } },
       _count: { select: { challenges: true } },
     },
     orderBy: { user: { createdAt: "desc" } },

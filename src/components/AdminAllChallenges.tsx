@@ -34,6 +34,11 @@ function isPastDeadline(c: any) {
   return new Date(c.deadline).getTime() < Date.now();
 }
 
+function getEffectiveStatus(c: any): string {
+  if (c.status === "PUBLISHED" && isPastDeadline(c)) return "CLOSED";
+  return c.status;
+}
+
 function AnimatedCount({ value }: { value: number }) {
   const [display, setDisplay] = useState(0);
   const prev = useRef(0);
@@ -164,11 +169,12 @@ export default function AdminAllChallenges() {
   }, [selected, search]);
 
   const filtered = useMemo(() => {
-    let list = challenges.filter((c) => {
+   let list = challenges.filter((c) => {
+      const effStatus = getEffectiveStatus(c);
       if (statusFilter !== "ALL") {
         if (statusFilter === "CLOSED") {
-          if (c.status !== "CLOSED" && c.status !== "COMPLETED") return false;
-        } else if (c.status !== statusFilter) return false;
+          if (effStatus !== "CLOSED" && effStatus !== "COMPLETED") return false;
+        } else if (effStatus !== statusFilter) return false;
       }
       if (verifiedOnly && !c.organizer?.isVerified) return false;
       if (dateFrom && new Date(c.deadline) < new Date(dateFrom)) return false;
@@ -202,9 +208,9 @@ export default function AdminAllChallenges() {
 
   const counts = {
     ALL: challenges.length,
-    PUBLISHED: challenges.filter((c) => c.status === "PUBLISHED").length,
+    PUBLISHED: challenges.filter((c) => getEffectiveStatus(c) === "PUBLISHED").length,
     DRAFT: challenges.filter((c) => c.status === "DRAFT").length,
-    CLOSED: challenges.filter((c) => c.status === "CLOSED" || c.status === "COMPLETED").length,
+    CLOSED: challenges.filter((c) => { const s = getEffectiveStatus(c); return s === "CLOSED" || s === "COMPLETED"; }).length,
   };
 
   const filtersActive = !!(search || statusFilter !== "ALL" || dateFrom || dateTo || verifiedOnly || sort !== "deadline-soon");
@@ -486,8 +492,8 @@ export default function AdminAllChallenges() {
         <>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {visible.map((c, i) => {
-              const s = STATUS_STYLES[c.status] || STATUS_STYLES.DRAFT;
-              const overdue = c.status === "PUBLISHED" && isPastDeadline(c);
+             const s = STATUS_STYLES[getEffectiveStatus(c)] || STATUS_STYLES.DRAFT;
+              const overdue = false;
               return (
                 <div
                   key={c.id}
@@ -556,7 +562,7 @@ export default function AdminAllChallenges() {
               </thead>
               <tbody>
                 {visible.map((c, i) => {
-                  const s = STATUS_STYLES[c.status] || STATUS_STYLES.DRAFT;
+                  const s = STATUS_STYLES[getEffectiveStatus(c)] || STATUS_STYLES.DRAFT;
                   return (
                     <tr key={c.id} className="ac-tr" onClick={() => setSelected(c)} style={{ borderBottom: "1px solid rgba(15,23,42,0.05)", animationDelay: `${Math.min(i * 0.03, 0.3)}s` }}>
                       <td style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
@@ -615,7 +621,7 @@ export default function AdminAllChallenges() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
               {[
-                { label: "Status", value: (STATUS_STYLES[selected.status] || STATUS_STYLES.DRAFT).label },
+                { label: "Status", value: (STATUS_STYLES[getEffectiveStatus(selected)] || STATUS_STYLES.DRAFT).label },
                 { label: "Submissions", value: String(selected._count?.submissions || 0) },
                 { label: "Participants", value: String(selected._count?.participations || 0) },
                 { label: "Deadline", value: new Date(selected.deadline).toLocaleString() },

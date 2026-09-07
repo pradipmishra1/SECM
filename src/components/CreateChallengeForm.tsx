@@ -54,7 +54,9 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
   const [description, setDescription] = useState("");
   const [rules, setRules] = useState("");
   const [deadline, setDeadline] = useState("");
-  const [prize, setPrize] = useState("");
+  const [prizeFirst, setPrizeFirst] = useState("");
+  const [prizeSecond, setPrizeSecond] = useState("");
+  const [prizeThird, setPrizeThird] = useState("");
   const [maxTeamSize, setMaxTeamSize] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -99,10 +101,10 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
     setError("");
     setLoading(true);
 
-    const res = await fetch("/api/challenges", {
+        const res = await fetch("/api/challenges", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, type, description, rules, deadline, prize, maxTeamSize, tags }),
+      body: JSON.stringify({ title, type, description, rules, deadline, prizeFirst, prizeSecond, prizeThird, maxTeamSize, tags }),
     });
 
     const data = await res.json();
@@ -290,15 +292,22 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
             </div>
           </div>
 
-          <div>
-            <label style={labelStyle}>Prize</label>
-            <input
-              className="ccf-input"
-              style={inputStyle}
-              value={prize}
-              onChange={(e) => setPrize(e.target.value)}
-              placeholder="e.g. Rs. 10,000"
-            />
+                   <div>
+            <label style={labelStyle}>Prizes</label>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: "rgba(20,19,43,0.4)", marginBottom: 5, display: "block" }}>🥇 1st Place</label>
+                <input className="ccf-input" style={inputStyle} value={prizeFirst} onChange={(e) => setPrizeFirst(e.target.value)} placeholder="e.g. Rs. 10,000" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: "rgba(20,19,43,0.4)", marginBottom: 5, display: "block" }}>🥈 2nd Place</label>
+                <input className="ccf-input" style={inputStyle} value={prizeSecond} onChange={(e) => setPrizeSecond(e.target.value)} placeholder="e.g. Rs. 5,000" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: "rgba(20,19,43,0.4)", marginBottom: 5, display: "block" }}>🥉 3rd Place</label>
+                <input className="ccf-input" style={inputStyle} value={prizeThird} onChange={(e) => setPrizeThird(e.target.value)} placeholder="e.g. Rs. 2,000" />
+              </div>
+            </div>
           </div>
 
           <div>
@@ -401,9 +410,9 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
               <span style={{ fontSize: 11.5, color: "rgba(20,19,43,0.4)" }}>
                 {deadline ? new Date(deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No deadline set"}
               </span>
-              {prize && (
+                           {prizeFirst && (
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#D97706", background: "rgba(217,119,6,0.06)", padding: "3px 10px", borderRadius: 20 }}>
-                  🏆 {prize}
+                  🏆 {prizeFirst}
                 </span>
               )}
             </div>

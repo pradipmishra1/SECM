@@ -10,17 +10,18 @@ export default async function TeamsPage() {
   if (!session) redirect("/login");
   const user = session.user as any;
 
-  const teams = await prisma.team.findMany({
-    where: { members: { some: { userId: user.id } } },
-    include: { members: { include: { user: true } }, challenge: true },
-    orderBy: { id: "desc" },
-  });
-
-  const invites = await prisma.teamInvite.findMany({
-    where: { invitedUserId: user.id, status: "PENDING" },
-    include: { team: { include: { challenge: true } }, invitedBy: true },
-    orderBy: { createdAt: "desc" },
-  });
+   const [teams, invites] = await Promise.all([
+    prisma.team.findMany({
+      where: { members: { some: { userId: user.id } } },
+      include: { members: { include: { user: true } }, challenge: true },
+      orderBy: { id: "desc" },
+    }),
+    prisma.teamInvite.findMany({
+      where: { invitedUserId: user.id, status: "PENDING" },
+      include: { team: { include: { challenge: true } }, invitedBy: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
   return (
     <DashboardLayout role={user.role} userName={user.name}>

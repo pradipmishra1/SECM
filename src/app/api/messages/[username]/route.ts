@@ -41,6 +41,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       name: otherUser.name,
       username: otherUser.username,
       role: otherUser.role,
+      image: otherUser.image,
+      status: otherUser.status,
       isVerified: otherUser.organizerProfile?.isVerified || false,
     },
   });

@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,16 +6,401 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id                     String            @id @default(uuid())
+  name                   String
+  email                  String            @unique
+  role                   Role
+  createdAt              DateTime          @default(now())
+  emailVerified          Boolean           @default(false)
+  image                  String?
+  updatedAt              DateTime          @updatedAt
+  username               String            @unique
+  status                 AccountStatus     @default(ACTIVE)
+  bookmarks              Bookmark[]
+  comments               Comment[]
+  following              Follow[]          @relation("Following")
+  followers              Follow[]          @relation("Followers")
+  friendRequestsReceived Friendship[]      @relation("FriendRequestsReceived")
+  friendRequestsSent     Friendship[]      @relation("FriendRequestsSent")
+  receivedMessages       Message[]         @relation("ReceivedMessages")
+  sentMessages           Message[]         @relation("SentMessages")
+  notifications          Notification[]
+  organizerProfile       OrganizerProfile?
+  participations         Participation[]
+  reviewsGiven           Review[]
+  studentProfile         StudentProfile?
+  submissions            Submission[]
+  invitesSent            TeamInvite[]      @relation("InvitedBy")
+  invitesReceived        TeamInvite[]      @relation("InvitedUser")
+  teamMemberships        TeamMember[]
+  teamMessages           TeamMessage[]
+  accounts               Account[]
+  sessions               Session[]
+supportMessages        SupportMessage[]
+
+
+  @@map("user")
+}
+
+model StudentProfile {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  education    String?
+  skills       String[]
+  interests    String[]
+  bio          String?
+  bannerText   String?
+  portfolioUrl String?
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model OrganizerProfile {
+  id            String         @id @default(uuid())
+  userId        String         @unique
+  orgName       String
+  description   String?
+  isVerified    Boolean        @default(false)
+  announcements Announcement[]
+  challenges    Challenge[]
+  user          User           @relation(fields: [userId], references: [id])
+  subscription  Subscription?
+}
+
+model Comment {
+  id          String    @id @default(uuid())
+  challengeId String
+  userId      String
+  content     String
+  parentId    String?
+  createdAt   DateTime  @default(now())
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  parent      Comment?  @relation("Replies", fields: [parentId], references: [id])
+  replies     Comment[] @relation("Replies")
+  user        User      @relation(fields: [userId], references: [id])
+}
+
+model Challenge {
+  id             String            @id @default(uuid())
+  organizerId    String
+  title          String
+  type           ChallengeType
+  description    String?
+  rules          String?
+  deadline       DateTime
+  prize          String?
+  status         ChallengeStatus   @default(DRAFT)
+  maxTeamSize    Int?
+  createdAt      DateTime          @default(now())
+  prizeFirst     String?
+  prizeSecond    String?
+  prizeThird     String?
+  bookmarks      Bookmark[]
+  organizer      OrganizerProfile  @relation(fields: [organizerId], references: [id])
+  comments       Comment[]
+  participations Participation[]
+  rubricCriteria RubricCriterion[]
+  submissions    Submission[]
+  tags           Tag[]
+  teams          Team[]
+  winners        Winner[]
+}
+
+model Tag {
+  id          String    @id @default(uuid())
+  name        String
+  color       String?
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+}
+
+model Participation {
+  id          String    @id @default(uuid())
+  challengeId String
+  userId      String
+  joinType    JoinType
+  status      String    @default("ACTIVE")
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+}
+
+model Team {
+  id          String        @id @default(uuid())
+  challengeId String
+  leaderId    String
+  name        String
+  submissions Submission[]
+  challenge   Challenge     @relation(fields: [challengeId], references: [id])
+  invites     TeamInvite[]
+  members     TeamMember[]
+  messages    TeamMessage[]
+}
+
+model TeamMember {
+  id     String   @id @default(uuid())
+  teamId String
+  userId String
+  role   TeamRole @default(MEMBER)
+  team   Team     @relation(fields: [teamId], references: [id])
+  user   User     @relation(fields: [userId], references: [id])
+}
+
+model Submission {
+  id          String    @id @default(uuid())
+  challengeId String
+  userId      String?
+  teamId      String?
+  fileUrl     String?
+  description String?
+  submittedAt DateTime  @default(now())
+  aiReview    AiReview?
+  review      Review?
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  team        Team?     @relation(fields: [teamId], references: [id])
+  user        User?     @relation(fields: [userId], references: [id])
+  winner      Winner?
+}
+
+model AiReview {
+  id           String     @id @default(uuid())
+  submissionId String     @unique
+  score        Int
+  feedback     String
+  createdAt    DateTime   @default(now())
+  submission   Submission @relation(fields: [submissionId], references: [id])
+}
+
+model FeatureFlag {
+  id      String  @id @default(uuid())
+  key     String  @unique
+  enabled Boolean @default(false)
+}
+
+model Subscription {
+  id          String             @id @default(uuid())
+  organizerId String             @unique
+  status      SubscriptionStatus @default(ACTIVE)
+  plan        String             @default("AI_REVIEW_MONTHLY")
+  amount      Int
+  provider    String
+  providerRef String?
+  startedAt   DateTime           @default(now())
+  expiresAt   DateTime
+  createdAt   DateTime           @default(now())
+  organizer   OrganizerProfile   @relation(fields: [organizerId], references: [id])
+}
+
+model Review {
+  id              String           @id @default(uuid())
+  submissionId    String           @unique
+  organizerId     String
+  score           Int
+  feedback        String?
+  criterionScores CriterionScore[]
+  organizer       User             @relation(fields: [organizerId], references: [id])
+  submission      Submission       @relation(fields: [submissionId], references: [id])
+}
+
+model Winner {
+  id           String     @id @default(uuid())
+  challengeId  String
+  submissionId String     @unique
+  position     Int
+  announcedAt  DateTime   @default(now())
+  seen         Boolean    @default(false)
+  challenge    Challenge  @relation(fields: [challengeId], references: [id])
+  submission   Submission @relation(fields: [submissionId], references: [id])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  content    String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
+
+  @@index([senderId, receiverId])
+}
+
+model TeamInvite {
+  id            String       @id @default(uuid())
+  teamId        String
+  invitedUserId String
+  invitedById   String
+  status        InviteStatus @default(PENDING)
+  createdAt     DateTime     @default(now())
+  invitedBy     User         @relation("InvitedBy", fields: [invitedById], references: [id])
+  invitedUser   User         @relation("InvitedUser", fields: [invitedUserId], references: [id])
+  team          Team         @relation(fields: [teamId], references: [id])
+
+  @@index([invitedUserId])
+}
+
+model Announcement {
+  id          String           @id @default(uuid())
+  organizerId String
+  title       String
+  message     String
+  createdAt   DateTime         @default(now())
+  organizer   OrganizerProfile @relation(fields: [organizerId], references: [id])
+}
+
+model TeamMessage {
+  id        String   @id @default(uuid())
+  teamId    String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+  sender    User     @relation(fields: [senderId], references: [id])
+  team      Team     @relation(fields: [teamId], references: [id])
+
+  @@index([teamId])
+}
+
+model RubricCriterion {
+  id          String           @id @default(uuid())
+  challengeId String
+  name        String
+  maxScore    Int              @default(10)
+  order       Int              @default(0)
+  scores      CriterionScore[]
+  challenge   Challenge        @relation(fields: [challengeId], references: [id])
+}
+
+model CriterionScore {
+  id          String          @id @default(uuid())
+  reviewId    String
+  criterionId String
+  score       Int
+  criterion   RubricCriterion @relation(fields: [criterionId], references: [id])
+  review      Review          @relation(fields: [reviewId], references: [id])
+}
+
+model Bookmark {
+  id          String    @id @default(uuid())
+  userId      String
+  challengeId String
+  createdAt   DateTime  @default(now())
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, challengeId])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+}
+
+model Friendship {
+  id          String       @id @default(uuid())
+  requesterId String
+  addresseeId String
+  status      FriendStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  addressee   User         @relation("FriendRequestsReceived", fields: [addresseeId], references: [id])
+  requester   User         @relation("FriendRequestsSent", fields: [requesterId], references: [id])
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+}
+
+model Follow {
+  id            String   @id @default(uuid())
+  followerId    String
+  followingId   String
+  createdAt     DateTime @default(now())
+  follower      User     @relation("Following", fields: [followerId], references: [id])
+  followingUser User     @relation("Followers", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+}
+
+model SupportMessage {
+  id        String   @id @default(uuid())
+  userId    String
+  subject   String
+  message   String
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([status])
+}
+
 enum Role {
   STUDENT
   ORGANIZER
   ADMIN
 }
+
 enum AccountStatus {
   ACTIVE
   SUSPENDED
   DELETED
 }
+
 enum SubscriptionStatus {
   ACTIVE
   EXPIRED
@@ -47,317 +431,26 @@ enum TeamRole {
   MEMBER
 }
 
-model User {
-  id        String        @id @default(uuid())
-  name      String
-  email     String        @unique
-  username  String        @unique
-  role      Role
-  status    AccountStatus @default(ACTIVE)
-  createdAt DateTime      @default(now())
-
-  studentProfile   StudentProfile?
-  organizerProfile OrganizerProfile?
-  participations   Participation[]
-  submissions      Submission[]
-  reviewsGiven     Review[]
-  teamMemberships  TeamMember[]
-  emailVerified    Boolean           @default(false)
-  image            String?
-  updatedAt        DateTime          @updatedAt
- sessions         Session[]
-  accounts         Account[]
-sentMessages     Message[] @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
-  invitesReceived  TeamInvite[] @relation("InvitedUser")
-  invitesSent      TeamInvite[] @relation("InvitedBy")
-  comments         Comment[]
-  teamMessages     TeamMessage[]
-
-  @@map("user")
-}
-
-model StudentProfile {
-  id           String   @id @default(uuid())
-  userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id])
-  education    String?
-  skills       String[]
-  interests    String[]
-  bio          String?
-  portfolioUrl String?
-  bannerText   String?
-}
-
-model OrganizerProfile {
-  id          String  @id @default(uuid())
-  userId      String  @unique
-  user        User    @relation(fields: [userId], references: [id])
-  orgName     String
-  description String?
-  isVerified  Boolean @default(false)
-
-  challenges    Challenge[]
-  announcements Announcement[]
-  subscription  Subscription?
-}
-model Comment {
-  id          String    @id @default(uuid())
-  challengeId String
-  challenge   Challenge @relation(fields: [challengeId], references: [id])
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  content     String
-  parentId    String?
-  parent      Comment?  @relation("Replies", fields: [parentId], references: [id])
-  replies     Comment[] @relation("Replies")
-  createdAt   DateTime  @default(now())
-}
-
-model Challenge {
-  id          String           @id @default(uuid())
-  organizerId String
-  organizer   OrganizerProfile @relation(fields: [organizerId], references: [id])
-  title       String
-  type        ChallengeType
-  description String?
-  rules       String?
-  deadline    DateTime
-  prize       String?
-  status      ChallengeStatus  @default(DRAFT)
-  maxTeamSize Int?
-  createdAt   DateTime         @default(now())
-
-  tags             Tag[]
-  participations   Participation[]
-  teams            Team[]
-  submissions      Submission[]
-  winners          Winner[]
-  comments         Comment[]
-  rubricCriteria   RubricCriterion[]
-}
-
-model Tag {
-  id          String    @id @default(uuid())
-  name        String
-  color       String?
-  challengeId String
-  challenge   Challenge @relation(fields: [challengeId], references: [id])
-}
-
-model Participation {
-  id          String    @id @default(uuid())
-  challengeId String
-  challenge   Challenge @relation(fields: [challengeId], references: [id])
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  joinType    JoinType
-  status      String    @default("ACTIVE")
-}
-
-model Team {
-  id          String    @id @default(uuid())
-  challengeId String
-  challenge   Challenge @relation(fields: [challengeId], references: [id])
-  leaderId    String
-  name        String
-
-  members     TeamMember[]
-  submissions Submission[]
-  invites     TeamInvite[]
-  messages    TeamMessage[]
-}
-model TeamMember {
-  id     String   @id @default(uuid())
-  teamId String
-  team   Team     @relation(fields: [teamId], references: [id])
-  userId String
-  user   User     @relation(fields: [userId], references: [id])
-  role   TeamRole @default(MEMBER)
-}
-
-model Submission {
-  id          String    @id @default(uuid())
-  challengeId String
-  challenge   Challenge @relation(fields: [challengeId], references: [id])
-  userId      String?
-  user        User?     @relation(fields: [userId], references: [id])
-  teamId      String?
-  team        Team?     @relation(fields: [teamId], references: [id])
-  fileUrl     String?
-  description String?
-  submittedAt DateTime  @default(now())
-
-  review   Review?
-  aiReview AiReview?
-  winner   Winner?
-}
-
-model AiReview {
-  id           String     @id @default(uuid())
-  submissionId String     @unique
-  submission   Submission @relation(fields: [submissionId], references: [id])
-  score        Int
-  feedback     String
-  createdAt    DateTime   @default(now())
-}
-
-model FeatureFlag {
-  id      String  @id @default(uuid())
-  key     String  @unique
-  enabled Boolean @default(false)
-}
-
-model Subscription {
-  id          String             @id @default(uuid())
-  organizerId String             @unique
-  organizer   OrganizerProfile   @relation(fields: [organizerId], references: [id])
-  status      SubscriptionStatus @default(ACTIVE)
-  plan        String             @default("AI_REVIEW_MONTHLY")
-  amount      Int
-  provider    String
-  providerRef String?
-  startedAt   DateTime           @default(now())
-  expiresAt   DateTime
-  createdAt   DateTime           @default(now())
-}
-
-model Review {
-  id           String     @id @default(uuid())
-  submissionId String     @unique
-  submission   Submission @relation(fields: [submissionId], references: [id])
-  organizerId  String
-  organizer    User       @relation(fields: [organizerId], references: [id])
-  score        Int
-  feedback     String?
-
-  criterionScores CriterionScore[]
-}
-
-model Winner {
-  id           String     @id @default(uuid())
-  challengeId  String
-  challenge    Challenge  @relation(fields: [challengeId], references: [id])
-  submissionId String     @unique
-  submission   Submission @relation(fields: [submissionId], references: [id])
-  position     Int
-  announcedAt  DateTime   @default(now())
-  seen         Boolean    @default(false)
-}
-
-model Session {
-  id        String   @id
-  expiresAt DateTime
-  token     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([token])
-  @@index([userId])
-  @@map("session")
-}
-
-model Account {
-  id                    String    @id
-  accountId             String
-  providerId            String
-  userId                String
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accessToken           String?
-  refreshToken          String?
-  idToken               String?
-  accessTokenExpiresAt  DateTime?
-  refreshTokenExpiresAt DateTime?
-  scope                 String?
-  password              String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  @@index([userId])
-  @@map("account")
-}
-
-model Verification {
-  id         String   @id
-  identifier String
-  value      String
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([identifier])
-  @@map("verification")
-}
-model Message {
-  id         String   @id @default(uuid())
-  senderId   String
-  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
-  receiverId String
-  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
-  content    String
-  read       Boolean  @default(false)
-  createdAt  DateTime @default(now())
-
-  @@index([senderId, receiverId])
-}
 enum InviteStatus {
   PENDING
   ACCEPTED
   REJECTED
 }
 
-model TeamInvite {
-  id            String       @id @default(uuid())
-  teamId        String
-  team          Team         @relation(fields: [teamId], references: [id])
-  invitedUserId String
-  invitedUser   User         @relation("InvitedUser", fields: [invitedUserId], references: [id])
-  invitedById   String
-  invitedBy     User         @relation("InvitedBy", fields: [invitedById], references: [id])
-  status        InviteStatus @default(PENDING)
-  createdAt     DateTime     @default(now())
-
-  @@index([invitedUserId])
-}
-model Announcement {
-  id          String   @id @default(uuid())
-  organizerId String
-  organizer   OrganizerProfile @relation(fields: [organizerId], references: [id])
-  title       String
-  message     String
-  createdAt   DateTime @default(now())
-}
-model TeamMessage {
-  id        String   @id @default(uuid())
-  teamId    String
-  team      Team     @relation(fields: [teamId], references: [id])
-  senderId  String
-  sender    User     @relation(fields: [senderId], references: [id])
-  content   String
-  createdAt DateTime @default(now())
-
-  @@index([teamId])
-}
-model RubricCriterion {
-  id          String   @id @default(uuid())
-  challengeId String
-  challenge   Challenge @relation(fields: [challengeId], references: [id])
-  name        String
-  maxScore    Int      @default(10)
-  order       Int      @default(0)
-
-  scores CriterionScore[]
+enum NotificationType {
+  TEAM_INVITE
+  TEAM_INVITE_ACCEPTED
+  SUBMISSION_REVIEWED
+  WINNER_ANNOUNCED
+  ORGANIZER_VERIFIED
+  ACCOUNT_STATUS_CHANGE
+  FRIEND_REQUEST
+  FRIEND_REQUEST_ACCEPTED
+  NEW_FOLLOWER
 }
 
-model CriterionScore {
-  id          String          @id @default(uuid())
-  reviewId    String
-  review      Review          @relation(fields: [reviewId], references: [id])
-  criterionId String
-  criterion   RubricCriterion @relation(fields: [criterionId], references: [id])
-  score       Int
+enum FriendStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
 }

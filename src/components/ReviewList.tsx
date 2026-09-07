@@ -92,14 +92,18 @@ function SubmissionFilesModal({ submission, onClose }: { submission: any; onClos
   );
 }
 
+
+
 export default function ReviewList({
   challenges,
   selectedChallengeId,
   submissions,
+  aiReviewEnabled = false,
 }: {
   challenges: { id: string; title: string }[];
   selectedChallengeId: string;
   submissions: any[];
+  aiReviewEnabled?: boolean;
 }) {
   const router = useRouter();
   const [scores, setScores] = useState<Record<string, string>>({});
@@ -110,6 +114,46 @@ export default function ReviewList({
   const [rubric, setRubric] = useState<any[]>([]);
   const [rubricLoading, setRubricLoading] = useState(true);
   const [viewingSubmission, setViewingSubmission] = useState<any>(null);
+  const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
+  const [aiResults, setAiResults] = useState<Record<string, { score: number; feedback: string }>>({});
+  const [aiError, setAiError] = useState<Record<string, string>>({});
+
+
+
+  async function runAiReview(submissionId: string) {
+    setAiLoadingId(submissionId);
+    setAiError((prev) => ({ ...prev, [submissionId]: "" }));
+    try {
+      const res = await fetch(`/api/submissions/${submissionId}/ai-review`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setAiError((prev) => ({ ...prev, [submissionId]: data.error || "AI review failed" }));
+      } else {
+        setAiResults((prev) => ({ ...prev, [submissionId]: { score: data.score, feedback: data.feedback } }));
+      }
+    } catch {
+      setAiError((prev) => ({ ...prev, [submissionId]: "AI review failed, try again" }));
+    }
+    setAiLoadingId(null);
+  }
+
+  async function acceptAiScore(submissionId: string, aiScore100: number, aiFeedback: string) {
+    setSavingId(submissionId);
+    setError("");
+    const scoreOutOf10 = Math.round((aiScore100 / 100) * 10);
+    const res = await fetch("/api/submissions/" + submissionId + "/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ score: scoreOutOf10, feedback: aiFeedback }),
+    });
+    setSavingId(null);
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error || "Failed to accept AI score");
+      return;
+    }
+    router.refresh();
+  }
 
   useEffect(() => {
     if (!selectedChallengeId) return;
@@ -364,6 +408,8 @@ export default function ReviewList({
                       style={feedbackInputStyle}
                     />
 
+
+
                     <button
                       className="rl-save-btn"
                       onClick={function () { saveReview(s.id); }}
@@ -382,6 +428,76 @@ export default function ReviewList({
                     >
                       {savingId === s.id ? "Saving..." : alreadyScored ? "Update Score" : "Save Score"}
                     </button>
+
+                    {aiReviewEnabled && (
+                      <>
+                        <button
+                          className="rl-save-btn"
+                          onClick={() => runAiReview(s.id)}
+                          disabled={aiLoadingId === s.id}
+                          style={{
+                            background: "rgba(109,74,255,0.08)",
+                            color: "#6D4AFF",
+                            border: "1px solid rgba(109,74,255,0.2)",
+                            borderRadius: 10,
+                            padding: "10px 0",
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            opacity: aiLoadingId === s.id ? 0.6 : 1,
+                          }}
+                        >
+                          {aiLoadingId === s.id ? "Running AI Review..." : (s.aiReview || aiResults[s.id]) ? "Re-run AI Review" : "Run AI Review"}
+                        </button>
+
+                        {aiError[s.id] && (
+                          <div style={{ fontSize: 11.5, color: "#B91C1C", background: "rgba(220,38,38,0.06)", padding: "6px 10px", borderRadius: 8 }}>
+                            {aiError[s.id]}
+                          </div>
+                        )}
+
+
+
+                        {(aiResults[s.id] || s.aiReview) && (
+                          <div style={{ background: "rgba(109,74,255,0.05)", border: "1px solid rgba(109,74,255,0.12)", borderRadius: 10, padding: "10px 12px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: "#6D4AFF", textTransform: "uppercase", letterSpacing: 0.4 }}>AI Score</span>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: "#4C2FCC" }}>
+                                {(aiResults[s.id]?.score ?? s.aiReview?.score)}/100
+                                <span style={{ fontSize: 10.5, fontWeight: 600, color: "rgba(76,47,204,0.6)", marginLeft: 4 }}>
+                                  (≈ {Math.round(((aiResults[s.id]?.score ?? s.aiReview?.score) / 100) * 10)}/10)
+                                </span>
+                              </span>
+                            </div>
+                            <p style={{ fontSize: 12, color: "rgba(20,19,43,0.65)", lineHeight: 1.5, marginBottom: 8 }}>
+                              {aiResults[s.id]?.feedback ?? s.aiReview?.feedback}
+                            </p>
+                            <button
+                              onClick={() => {
+                                const score = aiResults[s.id]?.score ?? s.aiReview?.score;
+                                const feedback = aiResults[s.id]?.feedback ?? s.aiReview?.feedback;
+                                acceptAiScore(s.id, score, feedback);
+                              }}
+                              disabled={savingId === s.id}
+                              style={{
+                                width: "100%",
+                                background: "#6D4AFF",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 8,
+                                padding: "8px 0",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                opacity: savingId === s.id ? 0.6 : 1,
+                              }}
+                            >
+                              {savingId === s.id ? "Saving..." : "Accept as Official Score"}
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 </TiltCard>
               </div>

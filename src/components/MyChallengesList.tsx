@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import ChallengeCard from "./ChallengeCard";
 import ChallengeModal from "./ChallengeModal";
 
@@ -54,6 +54,30 @@ const [active, setActive] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [studentStatusFilter, setStudentStatusFilter] = useState<string>("ALL");
   const [joinedOnly, setJoinedOnly] = useState(false);
+  const [bookmarkedOnly, setBookmarkedOnly] = useState(false);
+  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("/api/bookmarks")
+      .then((r) => r.json())
+      .then((d) => setBookmarkedIds(d.challengeIds || []));
+  }, []);
+
+  async function toggleBookmark(challengeId: string) {
+    setBookmarkedIds((prev) =>
+      prev.includes(challengeId) ? prev.filter((id) => id !== challengeId) : [...prev, challengeId]
+    );
+    const res = await fetch("/api/bookmarks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ challengeId }),
+    });
+    if (!res.ok) {
+      setBookmarkedIds((prev) =>
+        prev.includes(challengeId) ? prev.filter((id) => id !== challengeId) : [...prev, challengeId]
+      );
+    }
+  }
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "deadline" | "submissions">("newest");
 
@@ -88,6 +112,10 @@ const filteredChallenges = useMemo(() => {
       list = list.filter((c) => joinedIds.includes(c.id) || !!c.myTeamForThisChallenge);
     }
 
+    if (!isOrganizer && bookmarkedOnly) {
+      list = list.filter((c) => bookmarkedIds.includes(c.id));
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((c) => c.title.toLowerCase().includes(q));
@@ -104,7 +132,7 @@ const filteredChallenges = useMemo(() => {
     });
 
     return list;
- }, [challenges, filterOrgId, statusFilter, studentStatusFilter, joinedOnly, search, sortBy, isOrganizer, joinedIds]);
+}, [challenges, filterOrgId, statusFilter, studentStatusFilter, joinedOnly, bookmarkedOnly, bookmarkedIds, search, sortBy, isOrganizer, joinedIds]);
 
   return (
     <>
@@ -214,7 +242,10 @@ const filteredChallenges = useMemo(() => {
               {STUDENT_STATUS_LABELS[s]}
             </button>
           ))}
-          <button
+
+
+
+<button
             onClick={() => setJoinedOnly(!joinedOnly)}
             style={{
               padding: "8px 16px",
@@ -232,6 +263,24 @@ const filteredChallenges = useMemo(() => {
             }}
           >
             {joinedOnly ? "✓" : ""} My Joined Only
+          </button>
+          <button
+            onClick={() => setBookmarkedOnly(!bookmarkedOnly)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 20,
+              border: bookmarkedOnly ? "none" : "1px solid rgba(217,119,6,0.25)",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: bookmarkedOnly ? "linear-gradient(135deg,#D97706,#B45309)" : "transparent",
+              color: bookmarkedOnly ? "#fff" : "#B45309",
+            }}
+          >
+            {bookmarkedOnly ? "🔖" : "🔖"} Bookmarked
           </button>
         </div>
       )}
@@ -295,11 +344,13 @@ const filteredChallenges = useMemo(() => {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 18 }}>
           {filteredChallenges.map((c, i) => (
             <div key={c.id} className="mc-grid-item" style={{ animationDelay: `${Math.min(i * 0.04, 0.3)}s` }}>
-              <ChallengeCard
+             <ChallengeCard
                 challenge={c}
                 onClick={() => setActive(c)}
                 isOrganizer={isOrganizer}
                 isJoined={joinedIds.includes(c.id) || !!c.myTeamForThisChallenge}
+                isBookmarked={bookmarkedIds.includes(c.id)}
+                onToggleBookmark={toggleBookmark}
               />
             </div>
           ))}

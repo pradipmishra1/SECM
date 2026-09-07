@@ -17,8 +17,17 @@ export default async function WinnersPage({
 
   if (user.role !== "ORGANIZER") redirect("/dashboard");
 
-  const organizerProfile = await prisma.organizerProfile.findUnique({ where: { userId: user.id } });
+  const organizerProfile = await prisma.organizerProfile.findUnique({
+    where: { userId: user.id },
+    include: { subscription: true },
+  });
   if (!organizerProfile) redirect("/dashboard/setup-profile");
+
+  const aiReviewFlag = await prisma.featureFlag.findUnique({ where: { key: "AI_REVIEW" } });
+  const hasActiveSubscription =
+    organizerProfile.subscription?.status === "ACTIVE" &&
+    new Date(organizerProfile.subscription.expiresAt) > new Date();
+  const aiReviewEnabled = !!aiReviewFlag?.enabled && hasActiveSubscription;
 
   const myChallenges = await prisma.challenge.findMany({
     where: { organizerId: organizerProfile.id },
@@ -49,10 +58,11 @@ export default async function WinnersPage({
       <p style={{ color: "rgba(20,19,43,0.5)", fontSize: 14, marginBottom: 24 }}>
         Announce 1st, 2nd, and 3rd place for your challenges.
       </p>
-      <WinnersManager
+           <WinnersManager
         challenges={myChallenges}
         selectedChallengeId={filterChallengeId || ""}
         submissions={JSON.parse(JSON.stringify(submissions))}
+        aiReviewEnabled={aiReviewEnabled}
       />
     </DashboardLayout>
   );

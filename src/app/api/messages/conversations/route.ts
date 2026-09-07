@@ -30,6 +30,8 @@ export async function GET() {
         name: otherUser.name,
         username: otherUser.username,
         role: otherUser.role,
+        image: otherUser.image,
+        status: otherUser.status,
         isVerified: otherUser.organizerProfile?.isVerified || false,
         lastMessage: m.content,
         lastAt: m.createdAt,

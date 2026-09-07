@@ -29,6 +29,10 @@ function winnerName(w: any) {
   return w.submission?.user?.name || w.submission?.team?.name || "Unknown";
 }
 
+function winnerImage(w: any) {
+  return w.submission?.user?.image || null;
+}
+
 function winnerUsername(w: any) {
   return w.submission?.user?.username || w.submission?.team?.username || w.submission?.user?.email || winnerName(w);
 }
@@ -486,10 +490,14 @@ export default function AdminAllWinners() {
                   style={{ animationDelay: `${Math.min(i * 0.04, 0.4)}s`, background: "#fff", border: "1px solid rgba(15,23,42,0.07)", borderRadius: 16, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <span className="aw-medal" style={{ fontSize: 28, display: "inline-block" }}>{medal.emoji}</span>
-                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: colorFor(name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 800, flexShrink: 0 }}>
-                      {initials(name)}
-                    </div>
+                                        <span className="aw-medal" style={{ fontSize: 28, display: "inline-block" }}>{medal.emoji}</span>
+                    {winnerImage(w) ? (
+                      <img src={winnerImage(w)!} alt={name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: colorFor(name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 800, flexShrink: 0 }}>
+                        {initials(name)}
+                      </div>
+                    )}
                     <div>
                       <div style={{ fontSize: 14.5, fontWeight: 700, color: "#14132B" }}>{name}</div>
                       <div style={{ fontSize: 12, color: "rgba(20,19,43,0.45)", marginTop: 2 }}>
@@ -543,10 +551,14 @@ export default function AdminAllWinners() {
                   const medal = getMedal(w.position);
                   return (
                     <tr key={w.id} className="aw-tr" onClick={() => setSelected(w)} style={{ borderBottom: "1px solid rgba(15,23,42,0.05)", animationDelay: `${Math.min(i * 0.03, 0.3)}s` }}>
-                      <td style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 26, height: 26, borderRadius: "50%", background: colorFor(name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 800, flexShrink: 0 }}>
-                          {initials(name)}
-                        </div>
+                                            <td style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                        {winnerImage(w) ? (
+                          <img src={winnerImage(w)!} alt={name} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: 26, height: 26, borderRadius: "50%", background: colorFor(name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 800, flexShrink: 0 }}>
+                            {initials(name)}
+                          </div>
+                        )}
                         <span style={{ fontWeight: 700, color: "#14132B" }}>{name}</span>
                       </td>
                       <td style={{ padding: "12px 16px" }}>
@@ -583,9 +595,13 @@ export default function AdminAllWinners() {
           <div className="aw-modal" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 48, height: 48, borderRadius: "50%", background: colorFor(winnerName(selected)), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800 }}>
-                  {initials(winnerName(selected))}
-                </div>
+                              {winnerImage(selected) ? (
+                  <img src={winnerImage(selected)!} alt={winnerName(selected)} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover" }} />
+                ) : (
+                  <div style={{ width: 48, height: 48, borderRadius: "50%", background: colorFor(winnerName(selected)), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800 }}>
+                    {initials(winnerName(selected))}
+                  </div>
+                )}
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 800, color: "#14132B" }}>{winnerName(selected)}</div>
                   <div style={{ fontSize: 12.5, color: "rgba(20,19,43,0.45)" }}>

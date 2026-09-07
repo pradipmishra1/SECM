@@ -43,20 +43,67 @@ function Confetti() {
   );
 }
 
+
 export default function WinnersManager({
   challenges,
   selectedChallengeId,
   submissions,
+  aiReviewEnabled = false,
 }: {
   challenges: { id: string; title: string }[];
   selectedChallengeId: string;
   submissions: any[];
+  aiReviewEnabled?: boolean;
 }) {
   const router = useRouter();
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
+  const [aiBatchLoading, setAiBatchLoading] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<{ submissionId: string; name: string; score: number; feedback: string; suggestedPosition: number }[] | null>(null);
+  const [aiAllResults, setAiAllResults] = useState<{ submissionId: string; name: string; score: number; error?: string }[] | null>(null);
+  const [confirmingAll, setConfirmingAll] = useState(false);
+
+  async function runAiBatch() {
+    setAiBatchLoading(true);
+    setError("");
+    setAiSuggestions(null);
+    setAiAllResults(null);
+    try {
+      const res = await fetch(`/api/challenges/${selectedChallengeId}/ai-batch-review`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "AI batch review failed");
+      } else {
+        setAiAllResults(data.results);
+        setAiSuggestions(data.suggestedWinners);
+      }
+    } catch {
+      setError("AI batch review failed, try again");
+    }
+    setAiBatchLoading(false);
+  }
+
+  async function confirmAiWinners() {
+    if (!aiSuggestions) return;
+    setConfirmingAll(true);
+    for (const s of aiSuggestions) {
+      await fetch("/api/submissions/" + s.submissionId + "/winner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ position: s.suggestedPosition, challengeId: selectedChallengeId }),
+      });
+    }
+    setConfirmingAll(false);
+    setAiSuggestions(null);
+    setAiAllResults(null);
+    setSuccessMsg("Winners confirmed from AI suggestions!");
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 3500);
+    setTimeout(() => setSuccessMsg(""), 4000);
+    router.refresh();
+  }
 
   function changeChallenge(id: string) {
     router.push("/dashboard/winners?challenge=" + id);
@@ -133,30 +180,116 @@ export default function WinnersManager({
         .clear-btn:hover:not(:disabled) { transform: translateY(-1px); background: rgba(220,38,38,0.15) !important; }
       `}</style>
 
-      <div style={{ marginBottom: 20, display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {challenges.map((c) => {
-          const isActive = c.id === selectedChallengeId;
-          return (
+
+      <div style={{ marginBottom: 20, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {challenges.map((c) => {
+            const isActive = c.id === selectedChallengeId;
+            return (
+              <button
+                key={c.id}
+                className="tab-pill"
+                onClick={() => changeChallenge(c.id)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 20,
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: isActive ? "linear-gradient(135deg,#6D4AFF,#8B5CF6)" : "rgba(20,19,43,0.05)",
+                  color: isActive ? "#fff" : "rgba(20,19,43,0.6)",
+                }}
+              >
+                {c.title}
+              </button>
+            );
+          })}
+        </div>
+
+        {aiReviewEnabled && (
+          <button
+            className="tab-pill"
+            onClick={runAiBatch}
+            disabled={aiBatchLoading}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 20,
+              border: "1px solid rgba(109,74,255,0.25)",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              background: "rgba(109,74,255,0.08)",
+              color: "#6D4AFF",
+              opacity: aiBatchLoading ? 0.6 : 1,
+            }}
+          >
+            {aiBatchLoading ? "Scoring all submissions..." : "AI Score All & Suggest Winners"}
+          </button>
+        )}
+      </div>
+
+      {aiAllResults && (
+        <div className="wm-anim" style={{ background: "#fff", border: "1px solid rgba(109,74,255,0.15)", borderRadius: 16, padding: 20, marginBottom: 20 }}>
+          <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 700, color: "#14132B", marginBottom: 12 }}>
+            AI Suggested Ranking
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+            {aiAllResults
+              .slice()
+              .sort((a, b) => (b.score || 0) - (a.score || 0))
+              .map((r) => {
+                const suggested = aiSuggestions?.find((s) => s.submissionId === r.submissionId);
+                return (
+                  <div
+                    key={r.submissionId}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      background: suggested ? "rgba(109,74,255,0.06)" : "#F6F5FB",
+                      border: suggested ? "1px solid rgba(109,74,255,0.2)" : "1px solid transparent",
+                    }}
+                  >
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: "#14132B" }}>
+                      {suggested && `#${suggested.suggestedPosition} `}{r.name}
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: r.error ? "#B91C1C" : "#4C2FCC" }}>
+                      {r.error ? "Failed to score" : `${r.score}/100`}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
             <button
-              key={c.id}
-              className="tab-pill"
-              onClick={() => changeChallenge(c.id)}
+              onClick={confirmAiWinners}
+              disabled={confirmingAll || !aiSuggestions?.length}
               style={{
-                padding: "8px 16px",
-                borderRadius: 20,
+                background: "linear-gradient(135deg,#16A34A,#15803D)",
+                color: "#fff",
                 border: "none",
+                borderRadius: 10,
+                padding: "10px 20px",
                 fontSize: 13,
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: "pointer",
-                background: isActive ? "linear-gradient(135deg,#6D4AFF,#8B5CF6)" : "rgba(20,19,43,0.05)",
-                color: isActive ? "#fff" : "rgba(20,19,43,0.6)",
+                opacity: confirmingAll ? 0.6 : 1,
               }}
             >
-              {c.title}
+              {confirmingAll ? "Confirming..." : "Confirm Top 3 as Winners"}
             </button>
-          );
-        })}
-      </div>
+            <button
+              onClick={() => { setAiAllResults(null); setAiSuggestions(null); }}
+              style={{ background: "rgba(20,19,43,0.05)", color: "#14132B", border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Podium summary */}
       {Object.keys(podium).length > 0 && (

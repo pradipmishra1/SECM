@@ -2,11 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import StatCard from "./StatCard";
 import AvatarStack from "./AvatarStack";
 import TiltCard from "./TiltCard";
 import { Icon } from "./icons";
-import AllChallengesModal from "./AllChallengesModal"; // ✅ imported
+import AllChallengesModal from "./AllChallengesModal";
 
 const STATUS_STYLES: Record<string, { label: string; color: string; bg: string }> = {
   DRAFT: { label: "Draft", color: "#6B7280", bg: "rgba(107,114,128,0.1)" },
@@ -14,6 +13,19 @@ const STATUS_STYLES: Record<string, { label: string; color: string; bg: string }
   CLOSED: { label: "Closed", color: "#B91C1C", bg: "rgba(220,38,38,0.1)" },
   COMPLETED: { label: "Ended", color: "#6B7280", bg: "rgba(107,114,128,0.1)" },
 };
+
+const CARD_THEMES = [
+  { bg: "linear-gradient(135deg, #F0EDFF 0%, #E6E0FF 100%)", blob: "rgba(109,74,255,0.18)", accent: "#6D4AFF" },
+  { bg: "linear-gradient(135deg, #E9F3FF 0%, #D6E9FF 100%)", blob: "rgba(37,99,235,0.16)", accent: "#2563EB" },
+  { bg: "linear-gradient(135deg, #FFF7E8 0%, #FFEFD1 100%)", blob: "rgba(245,158,11,0.18)", accent: "#D97706" },
+  { bg: "linear-gradient(135deg, #E8F9F1 0%, #D3F3E3 100%)", blob: "rgba(22,163,74,0.16)", accent: "#15803D" },
+];
+
+function getTheme(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return CARD_THEMES[hash % CARD_THEMES.length];
+}
 
 function daysLeft(deadline: string) {
   const diff = new Date(deadline).getTime() - Date.now();
@@ -24,6 +36,21 @@ function getEffectiveStatus(c: any): string {
   const isPastDeadline = new Date(c.deadline).getTime() < Date.now();
   if (isPastDeadline && (c.status === "PUBLISHED" || c.status === "CLOSED")) return "CLOSED";
   return c.status;
+}
+
+function GlowStat({ icon, label, value, theme, delay, onClick }: { icon: React.ReactNode; label: string; value: number; theme: typeof CARD_THEMES[0]; delay: string; onClick?: () => void }) {
+  return (
+    <div className="stat-anim" style={{ flex: 1, animationDelay: delay, cursor: onClick ? "pointer" : "default" }} onClick={onClick}>
+      <TiltCard intensity={5} glow={theme.blob} style={{ background: theme.bg, borderRadius: 18, border: "1px solid rgba(15,23,42,0.05)", padding: "18px 18px", position: "relative", overflow: "hidden", boxShadow: "0 6px 20px rgba(20,19,43,0.06)" }}>
+        <div style={{ position: "absolute", top: -24, right: -24, width: 80, height: 80, borderRadius: "50%", background: theme.blob }} />
+        <div style={{ width: 36, height: 36, borderRadius: 11, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: theme.accent, marginBottom: 12, position: "relative", boxShadow: "0 4px 12px rgba(20,19,43,0.1)" }}>
+          {icon}
+        </div>
+        <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 800, color: "#14132B", position: "relative" }}>{value}</div>
+        <div style={{ fontSize: 12, color: "rgba(20,19,43,0.55)", fontWeight: 700, marginTop: 3, position: "relative" }}>{label}</div>
+      </TiltCard>
+    </div>
+  );
 }
 
 export default function OrganizerDashboard({
@@ -47,7 +74,7 @@ export default function OrganizerDashboard({
   const [showAllChallenges, setShowAllChallenges] = useState(false);
 
   const needsAttention = challenges.filter((c) => pendingChallengeIds.includes(c.id));
-  const firstPendingId = needsAttention.length > 0 ? needsAttention[0].id : null; // ✅ defined
+  const firstPendingId = needsAttention.length > 0 ? needsAttention[0].id : null;
 
   const upcomingDeadlines = challenges
     .filter((c) => c.status === "PUBLISHED" && daysLeft(c.deadline) >= 0)
@@ -60,15 +87,18 @@ export default function OrganizerDashboard({
         @keyframes riseIn { from { opacity:0; transform: translateY(16px) scale(0.98); } to { opacity:1; transform: translateY(0) scale(1); } }
         @keyframes headIn { from { opacity:0; transform: translateX(-8px); } to { opacity:1; transform: translateX(0); } }
         @keyframes pulseDot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes orbFloat { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-10px,8px) scale(1.06); } }
         .head-anim { animation: headIn 0.5s cubic-bezier(.2,.8,.2,1) both; }
-        .stat-anim { animation: riseIn 0.55s cubic-bezier(.2,.8,.2,1) both; }
+        .stat-anim { animation: riseIn 0.55s cubic-bezier(.2,.8,.2,1) both; transition: transform 0.2s ease; }
+        .stat-anim:hover { transform: translateY(-3px); }
         .main-card { animation: riseIn 0.55s cubic-bezier(.2,.8,.2,1) both; }
         .side-card { animation: riseIn 0.55s cubic-bezier(.2,.8,.2,1) both; }
-        .attn-banner { animation: riseIn 0.5s cubic-bezier(.2,.8,.2,1) both; }
-        .row-anim { transition: background 0.2s ease, transform 0.2s cubic-bezier(.2,.8,.2,1); position: relative; }
-        .row-anim:hover { transform: translateX(4px); background: #F9F8FE; }
-        .row-icon { transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), background 0.3s ease; }
-        .row-anim:hover .row-icon { transform: rotate(-6deg) scale(1.08); background: rgba(109,74,255,0.16) !important; }
+        .attn-banner { animation: riseIn 0.5s cubic-bezier(.2,.8,.2,1) both; position: relative; overflow: hidden; }
+        .attn-orb { animation: orbFloat 6s ease-in-out infinite; }
+        .row-anim { transition: background 0.2s ease, transform 0.2s cubic-bezier(.2,.8,.2,1); position: relative; border-radius: 14px; }
+        .row-anim:hover { transform: translateX(4px); }
+        .row-icon { transition: transform 0.3s cubic-bezier(.34,1.56,.64,1); }
+        .row-anim:hover .row-icon { transform: rotate(-6deg) scale(1.08); }
         .view-all { position: relative; transition: gap 0.2s ease; display: inline-flex; align-items: center; gap: 4px; }
         .view-all:hover { gap: 8px; }
         .review-btn { transition: transform 0.15s ease, background 0.15s ease; }
@@ -138,27 +168,10 @@ export default function OrganizerDashboard({
       </div>
 
       <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
-        <div
-          className="stat-anim"
-          style={{ flex: 1, animationDelay: "0.05s", cursor: "pointer" }}
-          onClick={() => setShowAllChallenges(true)}
-        >
-          <StatCard label="Total Challenges" value={stats.totalChallenges} icon={<Icon.flag width={17} height={17} />} tone="violet" />
-        </div>
-        <div className="stat-anim" style={{ flex: 1, animationDelay: "0.12s" }}>
-          <StatCard label="Active Events" value={stats.activeEvents} icon={<Icon.clock width={17} height={17} />} tone="blue" />
-        </div>
-        <div className="stat-anim" style={{ flex: 1, animationDelay: "0.19s" }}>
-          <StatCard label="Submissions" value={stats.totalSubmissions} icon={<Icon.upload width={17} height={17} />} tone="amber" />
-        </div>
-        <div className="stat-anim" style={{ flex: 1, animationDelay: "0.26s" }}>
-          <StatCard
-            label="Pending Reviews"
-            value={stats.pendingReviews}
-            icon={<Icon.inbox width={17} height={17} />}
-            tone={stats.pendingReviews > 0 ? "amber" : "green"}
-          />
-        </div>
+        <GlowStat icon={<Icon.flag width={17} height={17} />} label="Total Challenges" value={stats.totalChallenges} theme={CARD_THEMES[0]} delay="0.05s" onClick={() => setShowAllChallenges(true)} />
+        <GlowStat icon={<Icon.clock width={17} height={17} />} label="Active Events" value={stats.activeEvents} theme={CARD_THEMES[1]} delay="0.12s" />
+        <GlowStat icon={<Icon.upload width={17} height={17} />} label="Submissions" value={stats.totalSubmissions} theme={CARD_THEMES[2]} delay="0.19s" />
+        <GlowStat icon={<Icon.inbox width={17} height={17} />} label="Pending Reviews" value={stats.pendingReviews} theme={stats.pendingReviews > 0 ? CARD_THEMES[2] : CARD_THEMES[3]} delay="0.26s" />
       </div>
 
       {needsAttention.length > 0 && (
@@ -166,18 +179,19 @@ export default function OrganizerDashboard({
           className="attn-banner"
           style={{
             marginBottom: 20,
-            background: "linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.02))",
+            background: "linear-gradient(135deg, #FFF7E8 0%, #FFEFD1 100%)",
             border: "1px solid rgba(245,158,11,0.2)",
-            borderRadius: 16,
-            padding: "16px 20px",
+            borderRadius: 18,
+            padding: "18px 22px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(245,158,11,0.15)", display: "flex", alignItems: "center", justifyContent: "center", color: "#B45309" }}>
-              <Icon.inbox width={16} height={16} />
+          <div className="attn-orb" style={{ position: "absolute", top: -30, right: 100, width: 100, height: 100, borderRadius: "50%", background: "rgba(245,158,11,0.15)" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 12, position: "relative" }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#B45309", boxShadow: "0 6px 16px rgba(20,19,43,0.1)" }}>
+              <Icon.inbox width={18} height={18} />
             </div>
             <div>
               <p style={{ fontSize: 13.5, fontWeight: 700, color: "#14132B" }}>
@@ -189,7 +203,7 @@ export default function OrganizerDashboard({
           <button
             onClick={() => router.push(firstPendingId ? `/dashboard/review?challenge=${firstPendingId}` : "/dashboard/review")}
             className="review-btn"
-            style={{ background: "#14132B", color: "#fff", border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
+            style={{ background: "#14132B", color: "#fff", border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", position: "relative" }}
           >
             Review now
           </button>
@@ -222,29 +236,31 @@ export default function OrganizerDashboard({
             ) : (
               challenges.slice(0, 5).map((c, i) => {
                 const s = STATUS_STYLES[getEffectiveStatus(c)] || STATUS_STYLES.DRAFT;
+                const theme = getTheme(c.id);
                 return (
                   <div
                     key={c.id}
                     className="row-anim"
                     style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "14px 10px", borderTop: i > 0 ? "1px solid rgba(15,23,42,0.05)" : "none", borderRadius: 12,
+                      padding: "14px 10px", marginTop: i > 0 ? 6 : 0,
+                      background: theme.bg,
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                      <div className="row-icon" style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(109,74,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#6D4AFF" }}>
+                      <div className="row-icon" style={{ width: 38, height: 38, borderRadius: 11, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: theme.accent, boxShadow: "0 4px 10px rgba(20,19,43,0.08)" }}>
                         <Icon.flag width={16} height={16} />
                       </div>
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: "#14132B" }}>{c.title}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#14132B" }}>{c.title}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                          <span style={{ fontSize: 12, color: "rgba(20,19,43,0.4)" }}>{new Date(c.deadline).toLocaleDateString()}</span>
-                          <AvatarStack count={c.participations?.length || 0} />
+                          <span style={{ fontSize: 12, color: "rgba(20,19,43,0.5)" }}>{new Date(c.deadline).toLocaleDateString()}</span>
+                                                                             <AvatarStack members={(c.participations || []).filter((p: any) => p && p.user).map((p: any) => ({ name: p.user.name, image: p.user.image }))} />
                         </div>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 20, color: s.color, background: s.bg }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 20, color: s.color, background: "#fff" }}>
                         {s.label}
                       </span>
                       <button

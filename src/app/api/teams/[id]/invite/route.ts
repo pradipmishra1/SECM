@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,8 +31,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Invite already sent" }, { status: 400 });
   }
 
-  const invite = await prisma.teamInvite.create({
+ const invite = await prisma.teamInvite.create({
     data: { teamId: id, invitedUserId: invitedUser.id, invitedById: userId },
+  });
+
+  await createNotification({
+    userId: invitedUser.id,
+    type: "TEAM_INVITE",
+    title: "New team invite",
+    message: `You've been invited to join team "${team.name}"`,
+    link: "/dashboard/teams",
   });
 
   return NextResponse.json({ invite });

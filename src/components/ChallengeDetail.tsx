@@ -19,21 +19,25 @@ export default function ChallengeDetail({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [optimisticJoined, setOptimisticJoined] = useState(alreadyJoined);
 
   async function joinSolo() {
-    setLoading(true);
+    // Optimistic update: flip the UI to "Joined" immediately
+    setOptimisticJoined(true);
     setError("");
     const res = await fetch(`/api/challenges/${challenge.id}/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ joinType: "SOLO" }),
     });
-    const data = await res.json();
-    setLoading(false);
     if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      // Roll back on failure
+      setOptimisticJoined(false);
       setError(data.error || "Failed to join");
       return;
     }
+    // Sync server state in the background, no visible loading needed
     router.refresh();
   }
 
@@ -70,8 +74,8 @@ export default function ChallengeDetail({
         </div>
 
         <div style={{ animation: "popIn 0.4s ease" }}>
-          {role === "STUDENT" &&
-            (alreadyJoined || myTeam ? (
+                    {role === "STUDENT" &&
+            (optimisticJoined || myTeam ? (
               <span
                 style={{
                   background: "rgba(22,163,74,0.1)",
@@ -89,10 +93,9 @@ export default function ChallengeDetail({
               </span>
             ) : (
               <div style={{ display: "flex", gap: 10 }}>
-                <button
+                                <button
                   className="sec-btn"
                   onClick={joinSolo}
-                  disabled={loading}
                   style={{
                     background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)",
                     color: "#fff",
@@ -105,7 +108,7 @@ export default function ChallengeDetail({
                     boxShadow: "0 6px 16px rgba(109,74,255,0.25)",
                   }}
                 >
-                  {loading ? "Joining..." : "Join Solo"}
+                  Join Solo
                 </button>
                 <button
                   className="sec-btn"
@@ -154,7 +157,7 @@ export default function ChallengeDetail({
             </p>
           </div>
 
-          {(alreadyJoined || myTeam) && role === "STUDENT" && (
+                   {(optimisticJoined || myTeam) && role === "STUDENT" && (
             <button
               className="sec-btn"
               onClick={() => router.push(`/dashboard/challenge/${challenge.id}/submit`)}

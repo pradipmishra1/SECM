@@ -17,17 +17,25 @@ export default async function ReviewPage({
 
   if (user.role !== "ORGANIZER") redirect("/dashboard");
 
-  const organizerProfile = await prisma.organizerProfile.findUnique({ where: { userId: user.id } });
+
+  const organizerProfile = await prisma.organizerProfile.findUnique({
+    where: { userId: user.id },
+    include: { subscription: true },
+  });
   if (!organizerProfile) redirect("/dashboard/setup-profile");
+
+  const aiReviewFlag = await prisma.featureFlag.findUnique({ where: { key: "AI_REVIEW" } });
+  const hasActiveSubscription =
+    organizerProfile.subscription?.status === "ACTIVE" &&
+    new Date(organizerProfile.subscription.expiresAt) > new Date();
+  const aiReviewEnabled = !!aiReviewFlag?.enabled && hasActiveSubscription;
 
   const myChallenges = await prisma.challenge.findMany({
     where: { organizerId: organizerProfile.id },
     select: { id: true, title: true },
     orderBy: { createdAt: "desc" },
   });
-
   const filterChallengeId = challengeIdParam || myChallenges[0]?.id;
-
   const submissions = filterChallengeId
     ? await prisma.submission.findMany({
         where: { challengeId: filterChallengeId },
@@ -35,6 +43,7 @@ export default async function ReviewPage({
           user: true,
           team: { include: { members: { include: { user: true } } } },
           review: true,
+          aiReview: true,
         },
         orderBy: { submittedAt: "desc" },
       })
@@ -48,10 +57,11 @@ export default async function ReviewPage({
       <p style={{ color: "rgba(20,19,43,0.5)", fontSize: 14, marginBottom: 24 }}>
         Review and score entries for your challenges.
       </p>
-      <ReviewList
+           <ReviewList
         challenges={myChallenges}
         selectedChallengeId={filterChallengeId || ""}
         submissions={JSON.parse(JSON.stringify(submissions))}
+        aiReviewEnabled={aiReviewEnabled}
       />
     </DashboardLayout>
   );

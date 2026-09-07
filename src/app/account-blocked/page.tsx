@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { LogoMark } from "@/components/Logo";
 
 export default async function AccountBlockedPage({
   searchParams,
@@ -16,7 +17,10 @@ export default async function AccountBlockedPage({
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F6F5FB", fontFamily: "'Inter', sans-serif", padding: 20 }}>
-      <div style={{ background: "#fff", borderRadius: 24, padding: 40, maxWidth: 440, textAlign: "center", boxShadow: "0 20px 50px rgba(20,19,43,0.1)" }}>
+     <div style={{ background: "#fff", borderRadius: 24, padding: 40, maxWidth: 440, textAlign: "center", boxShadow: "0 20px 50px rgba(20,19,43,0.1)" }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+          <LogoMark size={36} />
+        </div>
         <div
           style={{
             width: 64,

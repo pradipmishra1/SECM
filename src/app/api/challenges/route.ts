@@ -29,12 +29,10 @@ export async function POST(req: NextRequest) {
   const isVerified = organizerProfile.isVerified;
 
   const body = await req.json();
-  const { title, type, description, rules, deadline, prize, maxTeamSize, tags } = body;
-
+  const { title, type, description, rules, deadline, prizeFirst, prizeSecond, prizeThird, maxTeamSize, tags } = body;
   if (!title || !type || !deadline) {
     return NextResponse.json({ error: "Title, type, and deadline are required" }, { status: 400 });
   }
-
   const challenge = await prisma.challenge.create({
     data: {
       title,
@@ -42,7 +40,10 @@ export async function POST(req: NextRequest) {
       description,
       rules,
       deadline: new Date(deadline),
-      prize,
+      prize: prizeFirst || null,
+      prizeFirst: prizeFirst || null,
+      prizeSecond: prizeSecond || null,
+      prizeThird: prizeThird || null,
       maxTeamSize: maxTeamSize ? parseInt(maxTeamSize) : null,
       status: isVerified ? "PUBLISHED" : "DRAFT",
       organizerId: organizerProfile.id,

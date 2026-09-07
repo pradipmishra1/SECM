@@ -24,7 +24,7 @@ const getOrganizerData = cache(async (userId: string) => {
   }
 
 const [challenges, pendingReviews, recentSubmissions, pendingChallenges] = await Promise.all([
-    prisma.challenge.findMany({
+        prisma.challenge.findMany({
       where: { organizerId: organizerProfile.id },
       select: {
         id: true,
@@ -33,6 +33,9 @@ const [challenges, pendingReviews, recentSubmissions, pendingChallenges] = await
         deadline: true,
         status: true,
         createdAt: true,
+        participations: {
+          select: { user: { select: { name: true, image: true } } },
+        },
         _count: {
           select: {
             participations: true,
@@ -65,11 +68,7 @@ const [challenges, pendingReviews, recentSubmissions, pendingChallenges] = await
   const activeEvents = challenges.filter((c) => c.status === "PUBLISHED").length;
   const totalSubmissions = challenges.reduce((sum, c) => sum + c._count.submissions, 0);
 
-  const mappedChallenges = challenges.map((c) => ({
-    ...c,
-    participations: Array(c._count.participations).fill(null),
-    teams: Array(c._count.participations).fill(null),
-  }));
+   const mappedChallenges = challenges;
 
   const activity = recentSubmissions.map((s) => ({
     text: `${s.user?.name || s.team?.name || "Someone"} submitted to '${s.challenge.title}'`,
@@ -105,8 +104,11 @@ const getStudentData = cache(async (userId: string) => {
           select: { orgName: true },
         },
         tags: { select: { id: true, name: true } },
-        teams: {
+               teams: {
           select: { id: true, name: true, leaderId: true },
+        },
+               participations: {
+          select: { user: { select: { name: true, image: true } } },
         },
         _count: {
           select: { participations: true, submissions: true },
@@ -125,7 +127,10 @@ const getStudentData = cache(async (userId: string) => {
     prisma.submission.findMany({ where: { userId }, select: { submittedAt: true }, orderBy: { submittedAt: "desc" } }),
   ]);
 
-  const joinedIds = new Set(participations.map((p) => p.challengeId));
+   const joinedIds = new Set(participations.map((p) => p.challengeId));
+  const activeJoinedCount = challenges.filter(
+    (c) => joinedIds.has(c.id) && new Date(c.deadline).getTime() > Date.now()
+  ).length;
 
   // Upcoming deadlines: challenges the student has joined, not yet past deadline
   const upcomingDeadlines = challenges
@@ -145,7 +150,7 @@ const getStudentData = cache(async (userId: string) => {
     .sort((a, b) => b.matchCount - a.matchCount || new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
     .slice(0, 4);
 
-  // Streak: consecutive days (including today) with at least one submission
+   // Streak: consecutive days (including today) with at least one submission
   let streak = 0;
   if (mySubmissionDates.length > 0) {
     const daySet = new Set(mySubmissionDates.map((s) => new Date(s.submittedAt).toDateString()));
@@ -156,17 +161,40 @@ const getStudentData = cache(async (userId: string) => {
     }
   }
 
-  return {
+  // Weekly activity: submission counts for the last 6 weeks (oldest to newest)
+  const weeklyActivity: { label: string; count: number }[] = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - i * 7 - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+
+    const count = mySubmissionDates.filter((s) => {
+      const d = new Date(s.submittedAt);
+      return d >= weekStart && d < weekEnd;
+    }).length;
+
+    weeklyActivity.push({
+      label: weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      count,
+    });
+  }
+
+ return {
     challenges,
-    stats: {
-      activeChallenges: participations.length,
+       stats: {
+      activeChallenges: activeJoinedCount,
       teams: teamsLed,
       submissions,
       wins,
     },
-    upcomingDeadlines,
+       upcomingDeadlines,
     recommended,
     streak,
+    weeklyActivity,
+    joinedIds: Array.from(joinedIds),
   };
 });
 
@@ -184,7 +212,7 @@ export default async function DashboardPage() {
 
 if (user.role === "ADMIN") {
     return (
-      <DashboardLayout role={user.role} userName={user.name}>
+                 <DashboardLayout role={user.role} userName={user.name} userImage={user.image} emailVerified={user.emailVerified} userEmail={user.email}>
         <AdminDashboard userName={user.name} />
       </DashboardLayout>
     );
@@ -193,7 +221,7 @@ if (user.role === "ADMIN") {
   if (user.role === "ORGANIZER") {
     const data = await getOrganizerData(user.id);
     return (
-      <DashboardLayout role={user.role} userName={user.name}>
+            <DashboardLayout role={user.role} userName={user.name} userImage={user.image} emailVerified={user.emailVerified} userEmail={user.email}>
         <OrganizerDashboard userName={user.name} stats={data.stats} challenges={data.challenges} activity={data.activity} isVerified={data.isVerified} orgName={data.orgName} pendingChallengeIds={data.pendingChallengeIds} />
       </DashboardLayout>
     );
@@ -204,6 +232,7 @@ if (user.role === "ADMIN") {
 
 
 const data = await getStudentData(user.id);
+const openChallenges = data.challenges.filter((c) => new Date(c.deadline).getTime() > Date.now());
 
   const recentSubs = await prisma.submission.findMany({
     orderBy: { submittedAt: "desc" },
@@ -219,17 +248,19 @@ const data = await getStudentData(user.id);
   const board = await computeLeaderboard();
 
  return (
-  <DashboardLayout role={user.role} userName={user.name}>
+  <DashboardLayout role={user.role} userName={user.name} userImage={user.image} emailVerified={user.emailVerified}>
     <WinnerCelebration username={user.username} />
-    <StudentDashboard
+            <StudentDashboard
       userName={user.name}
       stats={data.stats}
-      challenges={data.challenges}
+      challenges={openChallenges}
       leaderboard={board}
       activity={activity}
       upcomingDeadlines={data.upcomingDeadlines}
       recommended={data.recommended}
       streak={data.streak}
+      weeklyActivity={data.weeklyActivity}
+      joinedIds={data.joinedIds}
     />
   </DashboardLayout>
 );

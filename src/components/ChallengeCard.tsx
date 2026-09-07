@@ -68,11 +68,15 @@ export default function ChallengeCard({
   onClick,
   isOrganizer = false,
   isJoined = false,
+  isBookmarked = false,
+  onToggleBookmark,
 }: {
   challenge: any;
   onClick: () => void;
   isOrganizer?: boolean;
   isJoined?: boolean;
+  isBookmarked?: boolean;
+  onToggleBookmark?: (challengeId: string) => void;
 }) {
  const status = challengeStatus(challenge.deadline, challenge.status);
   const isVerified = challenge.organizer?.isVerified;
@@ -235,8 +239,26 @@ export default function ChallengeCard({
                 </span>
               )}
             </div>
-            <div className="badge-enter" style={{ animationDelay: "0.1s" }}>
-              <StatusPill status={status} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {!isOrganizer && onToggleBookmark && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleBookmark(challenge.id);
+                  }}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer", padding: 0,
+                    fontSize: 17, lineHeight: 1, opacity: isBookmarked ? 1 : 0.35,
+                    filter: isBookmarked ? "none" : "grayscale(1)",
+                  }}
+                  title={isBookmarked ? "Remove bookmark" : "Bookmark this challenge"}
+                >
+                  🔖
+                </button>
+              )}
+              <div className="badge-enter" style={{ animationDelay: "0.1s" }}>
+                <StatusPill status={status} />
+              </div>
             </div>
           </div>
 

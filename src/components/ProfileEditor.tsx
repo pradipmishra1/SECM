@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import TiltCard from "./TiltCard";
 import AvatarStack from "./AvatarStack";
+import ProfileModal from "./ProfileModal";
 
 const ACHIEVEMENTS = [
   { icon: "/badges/first-submission.png", title: "First Submission", color: "#6D4AFF", type: "submission", threshold: 1 },
@@ -71,6 +72,8 @@ function compressImage(file: File): Promise<string> {
   });
 }
 
+type Tab = "overview" | "achievements" | "activity" | "teams";
+
 export default function ProfileEditor({
   user,
   role,
@@ -93,7 +96,10 @@ export default function ProfileEditor({
   currentUserId?: string;
 }) {
   const router = useRouter();
+  const [tab, setTab] = useState<Tab>("overview");
   const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(user.name || "");
+  const [username, setUsername] = useState(user.username || "");
   const [education, setEducation] = useState(studentProfile?.education || "");
   const [bio, setBio] = useState(studentProfile?.bio || organizerProfile?.description || "");
   const [skills, setSkills] = useState<string[]>(studentProfile?.skills || []);
@@ -115,42 +121,77 @@ export default function ProfileEditor({
   const [subsLoading, setSubsLoading] = useState(false);
   const [activeAchievement, setActiveAchievement] = useState<any>(null);
 
+  const [showFollowModal, setShowFollowModal] = useState(false);
+  const [followTab, setFollowTab] = useState<"followers" | "following">("followers");
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [following, setFollowing] = useState<any[]>([]);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [viewingUsername, setViewingUsername] = useState<string | null>(null);
+
   const fileRef = useRef<HTMLInputElement>(null);
- 
+  const [copied, setCopied] = useState(false);
+  const [rank, setRank] = useState<number | null>(null);
 
+  useEffect(() => {
+    if (role === "STUDENT" && user.username) {
+      fetch("/api/leaderboard")
+        .then((r) => r.json())
+        .then((d) => {
+          const board = d.leaderboard || d.board || [];
+          const idx = board.findIndex((entry: any) => entry.username === user.username || entry.name === user.name);
+          if (idx !== -1) setRank(idx + 1);
+        })
+        .catch(() => {});
+    }
+  }, [role, user.username]);
 
+  async function openFollowModal(t: "followers" | "following") {
+    setFollowTab(t);
+    setShowFollowModal(true);
+    setFollowLoading(true);
+    const res = await fetch("/api/follow/list");
+    const data = await res.json();
+    setFollowers(data.followers || []);
+    setFollowing(data.following || []);
+    setFollowLoading(false);
+  }
 
-const heroRef = useRef<HTMLDivElement>(null);
+  function copyProfileLink() {
+    const url = `${window.location.origin}/u/${user.username}`;
+    navigator.clipboard?.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
 
   function getPositionCount(position: number) {
-  if (position === 1) return stats?.firstPlaceCount || 0;
-  if (position === 2) return stats?.secondPlaceCount || 0;
-  return stats?.thirdPlaceCount || 0;
-}
+    if (position === 1) return stats?.firstPlaceCount || 0;
+    if (position === 2) return stats?.secondPlaceCount || 0;
+    return stats?.thirdPlaceCount || 0;
+  }
 
-const earnedSet = new Set(
-  ACHIEVEMENTS.filter((a) => {
-    if (a.type === "position") return getPositionCount(a.position!) >= a.threshold;
-    return (stats?.submissions || 0) >= a.threshold;
-  }).map((a) => a.title)
-);
+  const earnedSet = new Set(
+    ACHIEVEMENTS.filter((a) => {
+      if (a.type === "position") return getPositionCount(a.position!) >= a.threshold;
+      return (stats?.submissions || 0) >= a.threshold;
+    }).map((a) => a.title)
+  );
 
-const orgEarnedSet = new Set(
-  ORG_MILESTONES.filter((m) => {
-    if (m.type === "count") return (stats?.totalChallenges || 0) >= m.threshold;
-    if (m.type === "submissions") return (stats?.totalSubmissions || 0) >= m.threshold;
-    return (stats?.totalParticipations || 0) >= m.threshold;
-  }).map((m) => m.title)
-);
+  const orgEarnedSet = new Set(
+    ORG_MILESTONES.filter((m) => {
+      if (m.type === "count") return (stats?.totalChallenges || 0) >= m.threshold;
+      if (m.type === "submissions") return (stats?.totalSubmissions || 0) >= m.threshold;
+      return (stats?.totalParticipations || 0) >= m.threshold;
+    }).map((m) => m.title)
+  );
 
-const profileFields = [
-  { label: "Organization name", done: !!orgName },
-  { label: "Bio / description", done: !!bio },
-  { label: "Profile photo", done: !!avatar },
-  { label: "Verified status", done: !!organizerProfile?.isVerified },
-  { label: "First challenge created", done: (stats?.totalChallenges || 0) > 0 },
-];
-const profileStrength = Math.round((profileFields.filter((f) => f.done).length / profileFields.length) * 100);
+  const profileFields = [
+    { label: "Organization name", done: !!orgName },
+    { label: "Bio / description", done: !!bio },
+    { label: "Profile photo", done: !!avatar },
+    { label: "Verified status", done: !!organizerProfile?.isVerified },
+    { label: "First challenge created", done: (stats?.totalChallenges || 0) > 0 },
+  ];
+  const profileStrength = Math.round((profileFields.filter((f) => f.done).length / profileFields.length) * 100);
 
   function addSkill() {
     if (skillInput.trim() && !skills.includes(skillInput.trim())) {
@@ -174,6 +215,8 @@ const profileStrength = Math.round((profileFields.filter((f) => f.done).length /
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        name,
+        username,
         education,
         bio,
         skills,
@@ -186,7 +229,8 @@ const profileStrength = Math.round((profileFields.filter((f) => f.done).length /
     });
     setSaving(false);
     if (!res.ok) {
-      setError("Failed to save. Please try again.");
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Failed to save. Please try again.");
       return;
     }
     setSaved(true);
@@ -212,30 +256,30 @@ const profileStrength = Math.round((profileFields.filter((f) => f.done).length /
   }
 
   async function handleWinsCardClick() {
-  setActiveAchievement(null);
-  await openWins();
-  setShowWinsModal(true);
-}
-
-async function openWinsByPosition(position: number) {
-  setWinsLoading(true);
-  const res = await fetch(`/api/users/${user.username}/wins-by-position?position=${position}`);
-  const data = await res.json();
-  setWins(data.wins || []);
-  setWinsLoading(false);
-}
-
-async function handleBadgeClick(a: any, earned: boolean) {
-  if (!earned) return;
-  setActiveAchievement(a);
-  if (a.type === "position") {
-    await openWinsByPosition(a.position);
+    setActiveAchievement(null);
+    await openWins();
     setShowWinsModal(true);
-  } else {
-    await openSubmissions();
-    setShowSubsModal(true);
   }
-}
+
+  async function openWinsByPosition(position: number) {
+    setWinsLoading(true);
+    const res = await fetch(`/api/users/${user.username}/wins-by-position?position=${position}`);
+    const data = await res.json();
+    setWins(data.wins || []);
+    setWinsLoading(false);
+  }
+
+  async function handleBadgeClick(a: any, earned: boolean) {
+    if (!earned) return;
+    setActiveAchievement(a);
+    if (a.type === "position") {
+      await openWinsByPosition(a.position);
+      setShowWinsModal(true);
+    } else {
+      await openSubmissions();
+      setShowSubsModal(true);
+    }
+  }
 
   const SKILL_COLORS = [
     { bg: "#EDE9FE", text: "#5B21B6" },
@@ -260,24 +304,32 @@ async function handleBadgeClick(a: any, earned: boolean) {
   const cardBase: React.CSSProperties = { background: "#fff", borderRadius: 18, border: "1px solid rgba(15,23,42,0.07)", padding: 22 };
   const cardTitle: React.CSSProperties = { fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 700, color: "#14132B", display: "flex", alignItems: "center", gap: 8, marginBottom: 16 };
 
+  const TABS: { key: Tab; label: string }[] = [
+    { key: "overview", label: "Overview" },
+    ...(role === "STUDENT" ? [{ key: "achievements" as Tab, label: `Achievements (${earnedSet.size})` }] : [{ key: "achievements" as Tab, label: `Milestones (${orgEarnedSet.size})` }]),
+    { key: "activity", label: role === "STUDENT" ? "Activity" : "Challenges" },
+    ...(role === "STUDENT" ? [{ key: "teams" as Tab, label: "Teams" }] : []),
+  ];
+
   return (
-    <div style={{ maxWidth: 1200 }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
       <style>{`
         @keyframes profRise { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: translateY(0); } }
-@keyframes floatOrb1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-16px,14px) scale(1.08); } }
-@keyframes floatOrb2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(12px,-10px) scale(0.92); } }
-@keyframes floatOrb3 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(20px,10px); } }
-.orb-float-1 { animation: floatOrb1 7s ease-in-out infinite; }
-.orb-float-2 { animation: floatOrb2 6s ease-in-out infinite; }
-.orb-float-3 { animation: floatOrb3 8s ease-in-out infinite; }
         @keyframes flipIn { from { opacity:0; transform: scale(0.97) translateY(6px); } to { opacity:1; transform: scale(1) translateY(0); } }
         @keyframes badgePop { from { opacity:0; transform: scale(0.8) translateY(10px); } to { opacity:1; transform: scale(1) translateY(0); } }
         @keyframes shimmer { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
         @keyframes popModalT { from { opacity:0; transform: scale(0.94) translateY(10px); } to { opacity:1; transform: scale(1) translateY(0); } }
-        @keyframes heroHueMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        @keyframes sheenSweep { 0% { transform: translateX(-160%) rotate(10deg); } 100% { transform: translateX(260%) rotate(10deg); } }
-        @keyframes heroRingSpin { to { transform: rotate(360deg); } }
+               @keyframes bannerDrift { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-3%,2%) scale(1.05); } }
+        @keyframes bannerDrift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(3%,-2%) scale(1.04); } }
+        @keyframes bannerDrift3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-2%,-3%) scale(1.06); } }
+        @keyframes tabUnderline { from { transform: scaleX(0); } to { transform: scaleX(1); } }
         @keyframes glowPulse { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+        @keyframes avatarRingSpin { to { transform: rotate(360deg); } }
+        @keyframes avatarGlow { 0%,100% { box-shadow: 0 10px 28px rgba(109,74,255,0.25); } 50% { box-shadow: 0 10px 40px rgba(109,74,255,0.45); } }
+        @keyframes sheenPass { 0% { transform: translateX(-120%) skewX(-15deg); } 100% { transform: translateX(220%) skewX(-15deg); } }
+        @keyframes numberPop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes badgeFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+
         .prof-anim { animation: profRise 0.5s cubic-bezier(.2,.8,.2,1) both; }
         .flip-card { animation: flipIn 0.35s cubic-bezier(.2,.8,.2,1) both; }
         .prof-input:focus { border-color: #6D4AFF !important; box-shadow: 0 0 0 4px rgba(109,74,255,0.1); }
@@ -293,308 +345,389 @@ async function handleBadgeClick(a: any, earned: boolean) {
         .ach-card:hover { transform: translateY(-4px); }
         .ach-badge-img { transition: transform 0.25s cubic-bezier(.34,1.56,.64,1); }
         .ach-card:hover .ach-badge-img { transform: scale(1.08) rotate(-3deg); }
-        .stat-card { transition: transform 0.2s ease; }
+                .stat-card { transition: transform 0.2s ease; }
         .stat-card:hover { transform: translateY(-3px); }
+        .profile-stat-card { position: relative; overflow: hidden; cursor: default; transition: transform 0.15s ease-out, box-shadow 0.2s ease; will-change: transform; }
+        .profile-stat-card:hover .profile-stat-shine { left: 120%; }
+        .profile-stat-shine { position: absolute; top: -20%; left: -60%; width: 40%; height: 160%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.5), transparent); transition: left 0.6s ease; pointer-events: none; }
         .locked-shimmer { animation: shimmer 2.2s ease-in-out infinite; }
         .activity-row { transition: background 0.15s ease; }
         .team-tile { transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; }
         .team-tile:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(109,74,255,0.15); }
         .avatar-upload { transition: transform 0.2s ease; cursor: pointer; }
         .avatar-upload:hover { transform: scale(1.05); }
-       .hero-card { position: relative; }
-        .hero-gradient-bg {
-          position: absolute; inset: 0;
-          background: linear-gradient(120deg,#6D4AFF 0%,#8B5CF6 45%,#A78BFA 100%);
-        }
-        .sheen-sweep {
-          position: absolute; top: -60%; left: 0; width: 35%; height: 220%;
-          background: linear-gradient(100deg, transparent, rgba(255,255,255,0.18), transparent);
-          animation: sheenSweep 7s ease-in-out infinite;
-          pointer-events: none;
-        }
-        .hero-glass { background: transparent; border: none; }
-        .hero-ring { animation: heroRingSpin 9s linear infinite; }
-        .hero-glow { animation: glowPulse 2.6s ease-in-out infinite; }
+        .follow-stat-hover { transition: opacity 0.15s ease; cursor: pointer; }
+        .follow-stat-hover:hover { opacity: 0.65; }
+        .glow-pulse { animation: glowPulse 2.6s ease-in-out infinite; }
+
+                .banner-blur-1 { position: absolute; border-radius: 50%; filter: blur(50px); animation: bannerDrift 10s ease-in-out infinite; }
+        .banner-blur-2 { position: absolute; border-radius: 50%; filter: blur(60px); animation: bannerDrift2 12s ease-in-out infinite; }
+        .banner-blur-3 { position: absolute; border-radius: 50%; filter: blur(55px); animation: bannerDrift3 13s ease-in-out infinite; }
+
+        .avatar-frame { position: relative; }
+        .avatar-ring-anim { animation: avatarRingSpin 12s linear infinite; }
+        .avatar-glow-anim { animation: avatarGlow 3s ease-in-out infinite; transition: transform 0.25s cubic-bezier(.34,1.56,.64,1); }
+        .avatar-glow-anim:hover { transform: scale(1.04) rotate(-2deg); }
+
+        .tab-btn { position: relative; background: none; border: none; padding: 10px 4px; font-size: 14px; font-weight: 700; cursor: pointer; transition: color 0.15s ease, transform 0.15s ease; }
+        .tab-btn:hover { transform: translateY(-1px); }
+        .tab-underline { position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: linear-gradient(90deg,#6D4AFF,#8B5CF6); transform-origin: left; animation: tabUnderline 0.25s ease; }
+
+        .name-badge-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .name-badge-hover:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(109,74,255,0.3); }
+
+        .stat-number-anim { animation: numberPop 0.4s cubic-bezier(.34,1.56,.64,1) both; }
+
+        .banner-sheen { position: absolute; top: 0; left: 0; width: 40%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.25), transparent); animation: sheenPass 5s ease-in-out infinite; pointer-events: none; }
+
+        .badge-float { animation: badgeFloat 2.4s ease-in-out infinite; }
+
         @media (prefers-reduced-motion: reduce) {
-          .hero-gradient-bg, .sheen-sweep, .hero-ring, .hero-glow, .orb-float-1, .orb-float-2, .orb-float-3, .locked-shimmer {
-            animation: none !important;
-          }
+          .banner-blur-1, .banner-blur-2, .banner-blur-3, .glow-pulse, .locked-shimmer, .avatar-ring-anim, .avatar-glow-anim, .banner-sheen, .badge-float { animation: none !important; }
         }
       `}</style>
 
-      {/* Hero banner */}
-     <div
-        ref={heroRef}
-        className="prof-anim hero-card"
-        style={{ animationDelay: "0s", borderRadius: 24, overflow: "hidden", marginBottom: 20, boxShadow: "0 20px 50px rgba(109,74,255,0.28)" }}
-      >
-        <div style={{ padding: "30px", position: "relative", overflow: "hidden" }}>
-          <div className="hero-gradient-bg" />
-         <div className="orb-float-1" style={{ position: "absolute", top: -40, right: -20, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.1)" }} />
-          <div className="orb-float-2" style={{ position: "absolute", top: 40, right: 120, width: 60, height: 60, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
-          <div className="orb-float-3" style={{ position: "absolute", bottom: -30, left: "30%", width: 100, height: 100, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
-          <div className="sheen-sweep" />
+      {/* Outer wrapper: NOT clipped, holds both the banner and the overlapping identity row */}
+      <div className="prof-anim" style={{ position: "relative", marginBottom: 22 }}>
+                {/* Soft blurred banner */}
+                <div style={{ position: "relative", height: 210, borderRadius: 24, overflow: "hidden", background: "linear-gradient(135deg,#F5F3FF,#EDE9FE)" }}>
+          <div className="banner-blur-1" style={{ top: -40, left: "10%", width: 220, height: 220, background: "rgba(109,74,255,0.35)" }} />
+          <div className="banner-blur-2" style={{ top: -20, right: "15%", width: 180, height: 180, background: "rgba(236,72,153,0.25)" }} />
+          <div className="banner-blur-1" style={{ bottom: -60, left: "40%", width: 200, height: 200, background: "rgba(139,92,246,0.3)", animationDelay: "2s" }} />
+          <div className="banner-blur-3" style={{ bottom: -30, right: "5%", width: 150, height: 150, background: "rgba(109,74,255,0.2)", animationDelay: "1s" }} />
+          <div className="banner-sheen" />
+        </div>
 
-          <div className="hero-glass" style={{ position: "relative", borderRadius: 18, padding: "22px 26px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-              <div style={{ position: "relative" }}>
-                <svg className="hero-ring" width="104" height="104" style={{ position: "absolute", top: -4, left: -4 }}>
-                  <circle cx="52" cy="52" r="50" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.5" strokeDasharray="6 9" />
-                </svg>
-                <div
-                  style={{
-                    width: 96,
-                    height: 96,
-                    borderRadius: "50%",
-                    background: avatar ? "transparent" : "rgba(255,255,255,0.15)",
-                    border: "3px solid rgba(255,255,255,0.5)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#fff",
-                    fontSize: 36,
-                    fontFamily: "'Sora', sans-serif",
-                    fontWeight: 700,
-                    flexShrink: 0,
-                    overflow: "hidden",
-                  }}
-                >
-                  {avatar ? <img src={avatar} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : user.name[0]?.toUpperCase()}
-                </div>
-              </div>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                  <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, color: "#fff" }}>{user.name}</h1>
-                  {role === "ORGANIZER" && organizerProfile?.isVerified && (
-                    <span title="Verified" className="hero-glow" style={{ color: "#fff", display: "inline-flex" }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)">
-                        <path d="M12 2l2.4 2.2 3.2-.6.8 3.2 3 1.5-1.2 3.1 1.2 3.1-3 1.5-.8 3.2-3.2-.6L12 22l-2.4-2.2-3.2.6-.8-3.2-3-1.5 1.2-3.1L2.6 9.5l3-1.5.8-3.2 3.2.6L12 2z" />
-                        <path d="M9 12l2 2 4-4" stroke="#6D4AFF" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </span>
-                  )}
-                </div>
-                {user.username && <p style={{ color: "rgba(255,255,255,0.85)", fontSize: 13.5, marginBottom: 6 }}>@{user.username}</p>}
-                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.5, background: "rgba(255,255,255,0.2)", color: "#fff", padding: "5px 14px", borderRadius: 20 }}>
-                  {role}
-                </span>
-                {bannerText && <p style={{ color: "rgba(255,255,255,0.9)", fontSize: 13, marginTop: 10, maxWidth: 400, fontStyle: "italic" }}>"{bannerText}"</p>}
-              </div>
-            </div>
+               {/* Identity row sits BELOW the banner div in the DOM, but pulled up visually to overlap it */}
+        <div style={{ position: "relative", marginTop: -142, padding: "0 22px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 18 }}>
 
-            <button
-              className="btn-anim"
-              onClick={() => setEditing(true)}
+
+                    <div className="avatar-glow-anim" style={{ width: 112, height: 112, flexShrink: 0 }}>
+            <div
+              className="avatar-upload"
               style={{
-                background: "#fff",
-                color: "#6D4AFF",
-                border: "none",
-                borderRadius: 10,
-                padding: "10px 20px",
-                fontSize: 13,
+                width: 112,
+                height: 112,
+                borderRadius: 26,
+                background: avatar ? "transparent" : "linear-gradient(135deg,#6D4AFF,#8B5CF6)",
+                border: "4px solid #fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                fontSize: 40,
+                fontFamily: "'Sora', sans-serif",
                 fontWeight: 700,
-                cursor: "pointer",
-                boxShadow: "0 6px 16px rgba(0,0,0,0.15)",
-                flexShrink: 0,
+                overflow: "hidden",
+                position: "relative",
               }}
             >
-              ✏️ Edit Profile
-            </button>
+              {avatar ? <img src={avatar} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : user.name[0]?.toUpperCase()}
+            </div>
           </div>
+
+          <div style={{ paddingBottom: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
+              <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 24, fontWeight: 700, color: "#14132B" }}>{user.name}</h1>
+                            <span className="name-badge-hover" style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff", padding: "4px 11px", borderRadius: 20, cursor: "default" }}>
+                {role}
+              </span>
+              {rank && (
+                <span className="name-badge-hover badge-float" style={{ fontSize: 10.5, fontWeight: 700, background: "rgba(217,119,6,0.1)", color: "#B45309", padding: "4px 11px", borderRadius: 20, cursor: "default" }}>🏅 Rank #{rank}</span>
+              )}
+              {role === "ORGANIZER" && organizerProfile?.isVerified && (
+                <span title="Verified" className="glow-pulse" style={{ color: "#2563EB", display: "inline-flex" }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 2.2 3.2-.6.8 3.2 3 1.5-1.2 3.1 1.2 3.1-3 1.5-.8 3.2-3.2-.6L12 22l-2.4-2.2-3.2.6-.8-3.2-3-1.5 1.2-3.1L2.6 9.5l3-1.5.8-3.2 3.2.6L12 2z" /><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </span>
+              )}
+            </div>
+            {user.username && <p style={{ color: "rgba(20,19,43,0.45)", fontSize: 13.5, marginBottom: 6 }}>@{user.username}</p>}
+            {bio && <p style={{ color: "rgba(20,19,43,0.6)", fontSize: 13, maxWidth: 420 }}>{bio}</p>}
+          </div>
+        </div>
+
+          <div className="follow-stat-hover" onClick={() => openFollowModal("followers")} style={{ textAlign: "center" }}>
+            <div className="stat-number-anim" style={{ fontFamily: "'Sora', sans-serif", fontSize: 18, fontWeight: 800, color: "#14132B" }}>{stats?.followerCount ?? 0}</div>
+            <div style={{ fontSize: 11, color: "rgba(20,19,43,0.45)", fontWeight: 600 }}>Followers</div>
+          </div>
+          <div className="follow-stat-hover" onClick={() => openFollowModal("following")} style={{ textAlign: "center" }}>
+            <div className="stat-number-anim" style={{ fontFamily: "'Sora', sans-serif", fontSize: 18, fontWeight: 800, color: "#14132B", animationDelay: "0.08s" }}>{stats?.followingCount ?? 0}</div>
+            <div style={{ fontSize: 11, color: "rgba(20,19,43,0.45)", fontWeight: 600 }}>Following</div>
+          </div>
+          <button
+            className="btn-anim"
+            onClick={copyProfileLink}
+            style={{ background: "#fff", color: "#6D4AFF", border: "1.5px solid rgba(109,74,255,0.25)", borderRadius: 10, padding: "9px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+          >
+            {copied ? "✓ Copied!" : "🔗 Share"}
+          </button>
+                                        <button
+            className="btn-anim"
+            onClick={() => setEditing(true)}
+            style={{ background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff", border: "none", borderRadius: 10, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 6px 16px rgba(109,74,255,0.3)" }}
+          >
+            ✏️ Edit Profile
+          </button>
         </div>
       </div>
 
-      {/* Stat row */}
-      {role === "STUDENT" && stats && (
-        <div className="prof-anim" style={{ animationDelay: "0.05s", display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 20 }}>
-          <div onClick={handleWinsCardClick} style={{ cursor: "pointer" }}>
-  <StatCard icon="🏆" label="Wins" value={stats.wins} tone="#D4A017" grad="linear-gradient(155deg,#FEF3C7,#FFFBEB)" />
-</div>
-<StatCard icon="🚀" label="Challenges Joined" value={stats.challengesJoined} tone="#6D4AFF" grad="linear-gradient(155deg,#EDE9FE,#F5F3FF)" />
-<StatCard icon="📤" label="Submissions" value={stats.submissions} tone="#2563EB" grad="linear-gradient(155deg,#DBEAFE,#EFF6FF)" />
-<StatCard icon="👥" label="Teams" value={stats.teamsCount} tone="#059669" grad="linear-gradient(155deg,#D1FAE5,#F0FDF4)" />
-<StatCard icon="🎖️" label="Badges Earned" value={earnedSet.size} tone="#DB2777" grad="linear-gradient(155deg,#FCE7F3,#FDF2F8)" />
-        </div>
-      )}
+      {/* Tabs */}
+      <div className="prof-anim" style={{ animationDelay: "0.08s", display: "flex", gap: 26, borderBottom: "1px solid rgba(15,23,42,0.08)", marginBottom: 22, padding: "0 8px" }}>
+        {TABS.map((t) => (
+          <button key={t.key} className="tab-btn" onClick={() => setTab(t.key)} style={{ color: tab === t.key ? "#14132B" : "rgba(20,19,43,0.4)" }}>
+            {t.label}
+            {tab === t.key && <div className="tab-underline" />}
+          </button>
+        ))}
+      </div>
 
-      {role === "ORGANIZER" && stats && (
-        <div className="prof-anim" style={{ animationDelay: "0.05s", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
-          <StatCard icon="🚩" label="Total Challenges" value={stats.totalChallenges || 0} tone="#6D4AFF" grad="linear-gradient(155deg,#EDE9FE,#F5F3FF)" />
-          <StatCard icon="⏱️" label="Active Now" value={stats.activeChallenges || 0} tone="#2563EB" grad="linear-gradient(155deg,#DBEAFE,#EFF6FF)" />
-          <StatCard icon="📤" label="Total Submissions" value={stats.totalSubmissions || 0} tone="#D97706" grad="linear-gradient(155deg,#FEF3C7,#FFFBEB)" />
-          <StatCard icon="👥" label="Total Participants" value={stats.totalParticipations || 0} tone="#059669" grad="linear-gradient(155deg,#D1FAE5,#F0FDF4)" />
-        </div>
-      )}
+      {/* OVERVIEW TAB */}
+      {tab === "overview" && (
+        <>
 
-      <div style={{ display: "grid", gridTemplateColumns: role === "STUDENT" ? "1fr 1fr" : "1fr", gap: 16 }}>
-        {/* About */}
-        <div className="prof-anim" style={{ animationDelay: "0.1s", ...cardBase }}>
-          <h3 style={cardTitle}>👤 About Me</h3>
 
-          {role === "ORGANIZER" && (
-            <div style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Organization</p>
-              <p style={{ fontSize: 14, color: "#14132B", fontWeight: 600 }}>{orgName || "Not set"}</p>
-            </div>
-          )}
 
-          {role === "STUDENT" && (
-            <div style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", marginBottom: 4 }}>🎓 Education</p>
-              <p style={{ fontSize: 14, color: education ? "#14132B" : "rgba(20,19,43,0.35)", fontWeight: education ? 600 : 400 }}>{education || "Not set yet"}</p>
-            </div>
-          )}
-
-          <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", marginBottom: 8 }}>Bio</p>
-            <p style={{ fontSize: 13.5, color: bio ? "rgba(20,19,43,0.7)" : "rgba(20,19,43,0.35)", lineHeight: 1.6 }}>
-              {bio || "No bio added yet."}
-            </p>
-          </div>
-
-          {role === "STUDENT" && portfolioUrl && (
-            <div style={{ marginBottom: skills.length > 0 ? 16 : 0 }}>
-              <p style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", marginBottom: 6 }}>Portfolio</p>
-              <a href={portfolioUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#6D4AFF", fontWeight: 600, wordBreak: "break-all" }}>
-                🔗 {portfolioUrl}
-              </a>
-            </div>
-          )}
-
-          {role === "STUDENT" && skills.length > 0 && (
-            <div>
-              <p style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", marginBottom: 8 }}>Skills</p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                {skills.map((s, i) => {
-                  const c = SKILL_COLORS[i % SKILL_COLORS.length];
-                  return (
-                    <span key={i} style={{ fontSize: 12, fontWeight: 700, padding: "6px 13px", borderRadius: 20, background: c.bg, color: c.text }}>
-                      {s}
-                    </span>
-                  );
-                })}
+          {role === "STUDENT" && stats && (
+            <div className="prof-anim" style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginBottom: 20 }}>
+              <div onClick={handleWinsCardClick} style={{ cursor: "pointer" }}>
+                <StatCard icon="🏆" label="Wins" value={stats.wins} tone="#D4A017" grad="linear-gradient(155deg,#FEF3C7,#FFFBEB)" />
               </div>
+              <MoneyStatCard icon="💰" label="Total Winnings" value={stats.totalWinnings || 0} tone="#15803D" grad="linear-gradient(155deg,#D1FAE5,#ECFDF5)" />
+              <StatCard icon="🚀" label="Challenges Joined" value={stats.challengesJoined} tone="#6D4AFF" grad="linear-gradient(155deg,#EDE9FE,#F5F3FF)" />
+              <StatCard icon="📤" label="Submissions" value={stats.submissions} tone="#2563EB" grad="linear-gradient(155deg,#DBEAFE,#EFF6FF)" />
+              <StatCard icon="👥" label="Teams" value={stats.teamsCount} tone="#059669" grad="linear-gradient(155deg,#D1FAE5,#F0FDF4)" />
+              <StatCard icon="🎖️" label="Badges Earned" value={earnedSet.size} tone="#DB2777" grad="linear-gradient(155deg,#FCE7F3,#FDF2F8)" />
             </div>
           )}
-        </div>
 
-        {role === "STUDENT" && (
-          <div className="prof-anim" style={{ animationDelay: "0.15s", ...cardBase }}>
-            <h3 style={cardTitle}>⚡ Recent Activity</h3>
-            {recentActivity.length === 0 ? (
-              <p style={{ fontSize: 13, color: "rgba(20,19,43,0.4)" }}>No activity yet.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                {recentActivity.map((a, i) => (
-                  <div key={i} className="activity-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 6px", borderTop: i > 0 ? "1px solid rgba(15,23,42,0.05)" : "none", borderRadius: 8 }}>
-                    <span style={{ fontSize: 15 }}>{a.type === "win" ? "🏆" : "📤"}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, color: "#14132B", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.text}</p>
-                    </div>
-                    <span style={{ fontSize: 11, color: "rgba(20,19,43,0.35)", flexShrink: 0 }}>{timeAgo(a.time)}</span>
+          {role === "ORGANIZER" && stats && (
+            <div className="prof-anim" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
+              <StatCard icon="🚩" label="Total Challenges" value={stats.totalChallenges || 0} tone="#6D4AFF" grad="linear-gradient(155deg,#EDE9FE,#F5F3FF)" />
+              <StatCard icon="⏱️" label="Active Now" value={stats.activeChallenges || 0} tone="#2563EB" grad="linear-gradient(155deg,#DBEAFE,#EFF6FF)" />
+              <StatCard icon="📤" label="Total Submissions" value={stats.totalSubmissions || 0} tone="#D97706" grad="linear-gradient(155deg,#FEF3C7,#FFFBEB)" />
+              <StatCard icon="👥" label="Total Participants" value={stats.totalParticipations || 0} tone="#059669" grad="linear-gradient(155deg,#D1FAE5,#F0FDF4)" />
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: role === "STUDENT" ? "1fr 1fr" : "1fr", gap: 16 }}>
+            <div className="prof-anim" style={{ animationDelay: "0.1s", ...cardBase }}>
+              <h3 style={cardTitle}>👤 About Me</h3>
+
+              {role === "ORGANIZER" && (
+                <div style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Organization</p>
+                  <p style={{ fontSize: 14, color: "#14132B", fontWeight: 600 }}>{orgName || "Not set"}</p>
+                </div>
+              )}
+
+              {role === "STUDENT" && (
+                <div style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", marginBottom: 4 }}>🎓 Education</p>
+                  <p style={{ fontSize: 14, color: education ? "#14132B" : "rgba(20,19,43,0.35)", fontWeight: education ? 600 : 400 }}>{education || "Not set yet"}</p>
+                </div>
+              )}
+
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", marginBottom: 8 }}>Bio</p>
+                <p style={{ fontSize: 13.5, color: bio ? "rgba(20,19,43,0.7)" : "rgba(20,19,43,0.35)", lineHeight: 1.6 }}>
+                  {bio || "No bio added yet."}
+                </p>
+              </div>
+
+              {role === "STUDENT" && portfolioUrl && (
+                <div style={{ marginBottom: skills.length > 0 ? 16 : 0 }}>
+                  <p style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", marginBottom: 6 }}>Portfolio</p>
+                  <a href={portfolioUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#6D4AFF", fontWeight: 600, wordBreak: "break-all" }}>
+                    🔗 {portfolioUrl}
+                  </a>
+                </div>
+              )}
+
+              {role === "STUDENT" && skills.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", marginBottom: 8 }}>Skills</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                    {skills.map((s, i) => {
+                      const c = SKILL_COLORS[i % SKILL_COLORS.length];
+                      return (
+                        <span key={i} style={{ fontSize: 12, fontWeight: 700, padding: "6px 13px", borderRadius: 20, background: c.bg, color: c.text }}>
+                          {s}
+                        </span>
+                      );
+                    })}
                   </div>
-                ))}
+                </div>
+              )}
+            </div>
+
+            {role === "STUDENT" && (
+              <div className="prof-anim" style={{ animationDelay: "0.15s", ...cardBase }}>
+                <h3 style={cardTitle}>⚡ Recent Activity</h3>
+                {recentActivity.length === 0 ? (
+                  <p style={{ fontSize: 13, color: "rgba(20,19,43,0.4)" }}>No activity yet.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    {recentActivity.slice(0, 5).map((a, i) => (
+                      <div key={i} className="activity-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 6px", borderTop: i > 0 ? "1px solid rgba(15,23,42,0.05)" : "none", borderRadius: 8 }}>
+                        <span style={{ fontSize: 15 }}>{a.type === "win" ? "🏆" : "📤"}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 13, color: "#14132B", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.text}</p>
+                        </div>
+                        <span style={{ fontSize: 11, color: "rgba(20,19,43,0.35)", flexShrink: 0 }}>{timeAgo(a.time)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-      </div>
 
-      {role === "ORGANIZER" && (
-        <div
-          className="prof-anim"
-          style={{
-            animationDelay: "0.12s",
-            marginTop: 16,
-            ...cardBase,
-            background: "linear-gradient(155deg,#EDE9FE 0%,#F5F3FF 100%)",
-            border: "1px solid rgba(109,74,255,0.12)",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          <div className="orb-float-2" style={{ position: "absolute", top: -30, right: -20, width: 140, height: 140, borderRadius: "50%", background: "rgba(109,74,255,0.08)" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, position: "relative" }}>
-            <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 700, color: "#14132B", display: "flex", alignItems: "center", gap: 8 }}>
-              ✨ Profile Strength
-            </h3>
-            <span className="hero-glow" style={{ fontSize: 20, fontWeight: 800, color: "#4C2FCC", fontFamily: "'Sora', sans-serif" }}>{profileStrength}%</span>
-          </div>
-          <div style={{ width: "100%", height: 8, borderRadius: 20, background: "rgba(76,47,204,0.1)", overflow: "hidden", marginBottom: 16, position: "relative" }}>
-            <div style={{ width: `${profileStrength}%`, height: "100%", borderRadius: 20, background: "linear-gradient(90deg,#6D4AFF,#8B5CF6)", transition: "width 0.6s cubic-bezier(.2,.8,.2,1)", position: "relative", overflow: "hidden" }}>
-              <div className="sheen-sweep" style={{ top: "-100%", height: "300%", width: "60%" }} />
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, position: "relative" }}>
-            {profileFields.map((f, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: f.done ? "#14132B" : "rgba(20,19,43,0.35)" }}>
-                <span style={{ width: 16, height: 16, borderRadius: "50%", background: f.done ? "rgba(109,74,255,0.18)" : "rgba(15,23,42,0.05)", color: "#6D4AFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, flexShrink: 0 }}>
-                  {f.done ? "✓" : ""}
-                </span>
-                {f.label}
+          {role === "ORGANIZER" && (
+            <div
+              className="prof-anim"
+              style={{
+                animationDelay: "0.12s",
+                marginTop: 16,
+                ...cardBase,
+                background: "linear-gradient(155deg,#EDE9FE 0%,#F5F3FF 100%)",
+                border: "1px solid rgba(109,74,255,0.12)",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, position: "relative" }}>
+                <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 700, color: "#14132B", display: "flex", alignItems: "center", gap: 8 }}>
+                  ✨ Profile Strength
+                </h3>
+                <span className="glow-pulse" style={{ fontSize: 20, fontWeight: 800, color: "#4C2FCC", fontFamily: "'Sora', sans-serif" }}>{profileStrength}%</span>
               </div>
-            ))}
-          </div>
-        </div>
+              <div style={{ width: "100%", height: 8, borderRadius: 20, background: "rgba(76,47,204,0.1)", overflow: "hidden", marginBottom: 16, position: "relative" }}>
+                <div style={{ width: `${profileStrength}%`, height: "100%", borderRadius: 20, background: "linear-gradient(90deg,#6D4AFF,#8B5CF6)", transition: "width 0.6s cubic-bezier(.2,.8,.2,1)" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, position: "relative" }}>
+                {profileFields.map((f, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: f.done ? "#14132B" : "rgba(20,19,43,0.35)" }}>
+                    <span style={{ width: 16, height: 16, borderRadius: "50%", background: f.done ? "rgba(109,74,255,0.18)" : "rgba(15,23,42,0.05)", color: "#6D4AFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, flexShrink: 0 }}>
+                      {f.done ? "✓" : ""}
+                    </span>
+                    {f.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      {role === "ORGANIZER" && (
-        <div className="prof-anim" style={{ animationDelay: "0.16s", marginTop: 16 }}>
-          <h3 style={{ ...cardTitle, marginBottom: 14 }}>
-            🏅 Organizer Milestones
-            <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(20,19,43,0.4)" }}>({orgEarnedSet.size}/{ORG_MILESTONES.length})</span>
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 14 }}>
-            {ORG_MILESTONES.map((m, i) => {
-              const earned = orgEarnedSet.has(m.title);
-              return (
-                <div key={i} className="badge-anim" style={{ animationDelay: `${i * 0.04}s` }}>
-                  <TiltCard
-                    intensity={earned ? 5 : 0}
-                    glow={earned ? `${m.grad[0]}55` : "transparent"}
+      {/* ACHIEVEMENTS / MILESTONES TAB */}
+      {tab === "achievements" && role === "STUDENT" && (
+        <div className="prof-anim" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 16 }}>
+          {ACHIEVEMENTS.map((a, i) => {
+            const earned = earnedSet.has(a.title);
+            return (
+              <div
+                key={i}
+                className="badge-anim ach-card"
+                style={{ animationDelay: `${i * 0.04}s`, cursor: earned ? "pointer" : "default" }}
+                onClick={() => handleBadgeClick(a, earned)}
+              >
+                <TiltCard
+                  intensity={earned ? 6 : 1}
+                  glow={earned ? `${a.color}66` : "rgba(15,23,42,0.06)"}
+                  style={{
+                    background: earned ? "linear-gradient(160deg,#1A1626,#2A2340)" : "#F6F5FB",
+                    borderRadius: 18,
+                    border: earned ? `1px solid ${a.color}44` : "1px solid rgba(15,23,42,0.06)",
+                    padding: "20px 12px",
+                    textAlign: "center",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                >
+                  {earned && <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at 50% 0%, ${a.color}28, transparent 65%)`, pointerEvents: "none" }} />}
+                  <div
+                    className="ach-badge-img"
                     style={{
-                      background: "#fff",
-                      borderRadius: 16,
-                      border: earned ? `1px solid ${m.grad[0]}33` : "1px solid rgba(15,23,42,0.06)",
-                      padding: "18px 10px",
-                      textAlign: "center",
-                      position: "relative",
-                      overflow: "hidden",
+                      width: 68, height: 68, borderRadius: "50%", margin: "0 auto 12px", overflow: "hidden",
+                      border: earned ? `2px solid ${a.color}66` : "1px solid rgba(15,23,42,0.08)",
+                      boxShadow: earned ? `0 10px 24px ${a.color}55` : "none",
+                      filter: earned ? "none" : "grayscale(1)", opacity: earned ? 1 : 0.35,
                     }}
                   >
-                    <div
-                      style={{
-                        width: 60,
-                        height: 60,
-                        borderRadius: "50%",
-                        margin: "0 auto 10px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: earned ? `linear-gradient(135deg, ${m.grad[0]}, ${m.grad[1]})` : "#F0EEF7",
-                        boxShadow: earned ? `0 8px 20px ${m.grad[0]}44` : "none",
-                        filter: earned ? "none" : "grayscale(1)",
-                        opacity: earned ? 1 : 0.4,
-                        position: "relative",
-                      }}
-                    >
-                      <MilestoneBadgeIcon type={m.svg} />
-                    </div>
-                    {!earned && <div className="locked-shimmer" style={{ position: "absolute", top: 14, right: "50%", transform: "translateX(26px)", fontSize: 11 }}>🔒</div>}
-                    <p style={{ fontSize: 11.5, fontWeight: 700, color: earned ? "#14132B" : "rgba(20,19,43,0.4)", lineHeight: 1.3, position: "relative" }}>{m.title}</p>
-                  </TiltCard>
-                </div>
-              );
-            })}
-          </div>
+                    <img src={a.icon} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                  {!earned && <div className="locked-shimmer" style={{ position: "absolute", top: 12, right: "50%", transform: "translateX(34px)", fontSize: 12 }}>🔒</div>}
+                  <p style={{ fontSize: 12, fontWeight: 700, color: earned ? "#F5D98C" : "rgba(20,19,43,0.4)", lineHeight: 1.35, position: "relative" }}>{a.title}</p>
+                  {earned && (
+                    <span style={{ display: "inline-block", marginTop: 6, fontSize: 9.5, fontWeight: 800, color: a.color, letterSpacing: 0.5, textTransform: "uppercase", background: `${a.color}22`, padding: "2px 8px", borderRadius: 20, position: "relative" }}>
+                      Unlocked
+                    </span>
+                  )}
+                </TiltCard>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {role === "ORGANIZER" && recentChallenges.length > 0 && (
-        <div className="prof-anim" style={{ animationDelay: "0.2s", marginTop: 16 }}>
-          <h3 style={{ ...cardTitle, marginBottom: 14 }}>🚩 Recent Challenges</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 16 }}>
-            {recentChallenges.map((c: any) => {
+      {tab === "achievements" && role === "ORGANIZER" && (
+        <div className="prof-anim" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 14 }}>
+          {ORG_MILESTONES.map((m, i) => {
+            const earned = orgEarnedSet.has(m.title);
+            return (
+              <div key={i} className="badge-anim" style={{ animationDelay: `${i * 0.04}s` }}>
+                <TiltCard
+                  intensity={earned ? 5 : 0}
+                  glow={earned ? `${m.grad[0]}55` : "transparent"}
+                  style={{ background: "#fff", borderRadius: 16, border: earned ? `1px solid ${m.grad[0]}33` : "1px solid rgba(15,23,42,0.06)", padding: "18px 10px", textAlign: "center", position: "relative", overflow: "hidden" }}
+                >
+                  <div
+                    style={{
+                      width: 60, height: 60, borderRadius: "50%", margin: "0 auto 10px", display: "flex", alignItems: "center", justifyContent: "center",
+                      background: earned ? `linear-gradient(135deg, ${m.grad[0]}, ${m.grad[1]})` : "#F0EEF7",
+                      boxShadow: earned ? `0 8px 20px ${m.grad[0]}44` : "none", filter: earned ? "none" : "grayscale(1)", opacity: earned ? 1 : 0.4,
+                    }}
+                  >
+                    <MilestoneBadgeIcon type={m.svg} />
+                  </div>
+                  {!earned && <div className="locked-shimmer" style={{ position: "absolute", top: 14, right: "50%", transform: "translateX(26px)", fontSize: 11 }}>🔒</div>}
+                  <p style={{ fontSize: 11.5, fontWeight: 700, color: earned ? "#14132B" : "rgba(20,19,43,0.4)", lineHeight: 1.3, position: "relative" }}>{m.title}</p>
+                </TiltCard>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ACTIVITY / CHALLENGES TAB */}
+      {tab === "activity" && role === "STUDENT" && (
+        <div className="prof-anim" style={cardBase}>
+          <h3 style={cardTitle}>⚡ Recent Activity</h3>
+          {recentActivity.length === 0 ? (
+            <p style={{ fontSize: 13, color: "rgba(20,19,43,0.4)" }}>No activity yet.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {recentActivity.map((a, i) => (
+                <div key={i} className="activity-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 6px", borderTop: i > 0 ? "1px solid rgba(15,23,42,0.05)" : "none", borderRadius: 8 }}>
+                  <span style={{ fontSize: 15 }}>{a.type === "win" ? "🏆" : "📤"}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, color: "#14132B", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.text}</p>
+                  </div>
+                  <span style={{ fontSize: 11, color: "rgba(20,19,43,0.35)", flexShrink: 0 }}>{timeAgo(a.time)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "activity" && role === "ORGANIZER" && (
+        <div className="prof-anim" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 16 }}>
+          {recentChallenges.length === 0 ? (
+            <p style={{ fontSize: 13, color: "rgba(20,19,43,0.4)" }}>No challenges created yet.</p>
+          ) : (
+            recentChallenges.map((c: any) => {
               const STATUS_META: Record<string, { color: string; bg: string; label: string }> = {
                 DRAFT: { color: "#6B7280", bg: "rgba(107,114,128,0.1)", label: "Draft" },
                 PUBLISHED: { color: "#15803D", bg: "rgba(22,163,74,0.1)", label: "Live" },
@@ -607,21 +740,10 @@ async function handleBadgeClick(a: any, earned: boolean) {
                 : 0;
               return (
                 <div key={c.id} onClick={() => router.push(`/dashboard/review?challenge=${c.id}`)} style={{ cursor: "pointer" }}>
-                  <TiltCard
-                    intensity={3}
-                    glow="rgba(109,74,255,0.1)"
-                    style={{
-                      background: "linear-gradient(160deg, #FBFAFF 0%, #F6F5FB 100%)",
-                      border: "1px solid rgba(109,74,255,0.1)",
-                      borderRadius: 18,
-                      padding: 18,
-                    }}
-                  >
+                  <TiltCard intensity={3} glow="rgba(109,74,255,0.1)" style={{ background: "linear-gradient(160deg, #FBFAFF 0%, #F6F5FB 100%)", border: "1px solid rgba(109,74,255,0.1)", borderRadius: 18, padding: 18 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                       <span style={{ fontSize: 14.5, fontWeight: 700, color: "#14132B", lineHeight: 1.3 }}>{c.title}</span>
-                      <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: sm.bg, color: sm.color, flexShrink: 0, marginLeft: 8, whiteSpace: "nowrap" }}>
-                        {sm.label}
-                      </span>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: sm.bg, color: sm.color, flexShrink: 0, marginLeft: 8, whiteSpace: "nowrap" }}>{sm.label}</span>
                     </div>
                     <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
                       <div>
@@ -643,99 +765,81 @@ async function handleBadgeClick(a: any, earned: boolean) {
                   </TiltCard>
                 </div>
               );
-            })}
-          </div>
+            })
+          )}
         </div>
       )}
 
-      {/* Achievements */}
-      {role === "STUDENT" && (
-        <div className="prof-anim" style={{ animationDelay: "0.2s", marginTop: 16 }}>
-          <h3 style={{ ...cardTitle, marginBottom: 14 }}>
-            🏅 Achievements
-            <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(20,19,43,0.4)" }}>({earnedSet.size}/{ACHIEVEMENTS.length})</span>
-          </h3>
-         
-
-
-
- <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 16 }}>
-            {ACHIEVEMENTS.map((a, i) => {
-              const earned = earnedSet.has(a.title);
-              return (
-                <div
-                  key={i}
-                  className="badge-anim ach-card"
-                  style={{ animationDelay: `${i * 0.04}s`, cursor: earned ? "pointer" : "default" }}
-                  onClick={() => handleBadgeClick(a, earned)}
-                >
-                  <TiltCard
-                    intensity={earned ? 6 : 1}
-                    glow={earned ? `${a.color}66` : "rgba(15,23,42,0.06)"}
-                    style={{
-                      background: earned ? "linear-gradient(160deg,#1A1626,#2A2340)" : "#F6F5FB",
-                      borderRadius: 18,
-                      border: earned ? `1px solid ${a.color}44` : "1px solid rgba(15,23,42,0.06)",
-                      padding: "20px 12px",
-                      textAlign: "center",
-                      position: "relative",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {earned && <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at 50% 0%, ${a.color}28, transparent 65%)`, pointerEvents: "none" }} />}
-                    <div
-                      className="ach-badge-img"
-                      style={{
-                        width: 68,
-                        height: 68,
-                        borderRadius: "50%",
-                        margin: "0 auto 12px",
-                        overflow: "hidden",
-                        border: earned ? `2px solid ${a.color}66` : "1px solid rgba(15,23,42,0.08)",
-                        boxShadow: earned ? `0 10px 24px ${a.color}55` : "none",
-                        position: "relative",
-                        filter: earned ? "none" : "grayscale(1)",
-                        opacity: earned ? 1 : 0.35,
-                      }}
-                    >
-                      <img src={a.icon} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    </div>
-                    {!earned && <div className="locked-shimmer" style={{ position: "absolute", top: 12, right: "50%", transform: "translateX(34px)", fontSize: 12 }}>🔒</div>}
-                    <p style={{ fontSize: 12, fontWeight: 700, color: earned ? "#F5D98C" : "rgba(20,19,43,0.4)", lineHeight: 1.35, position: "relative" }}>{a.title}</p>
-                    {earned && (
-                      <span style={{ display: "inline-block", marginTop: 6, fontSize: 9.5, fontWeight: 800, color: a.color, letterSpacing: 0.5, textTransform: "uppercase", background: `${a.color}22`, padding: "2px 8px", borderRadius: 20, position: "relative" }}>
-                        Unlocked
-                      </span>
-                    )}
-                  </TiltCard>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Your Teams */}
-      {role === "STUDENT" && teams.length > 0 && (
-        <div className="prof-anim" style={{ animationDelay: "0.25s", marginTop: 16, ...cardBase }}>
+      {/* TEAMS TAB */}
+      {tab === "teams" && role === "STUDENT" && (
+        <div className="prof-anim" style={cardBase}>
           <h3 style={cardTitle}>👥 Your Teams</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
-            {teams.map((t: any) => {
-              const isLeader = t.leaderId === currentUserId;
-              return (
-                <div key={t.id} className="team-tile" onClick={() => router.push(`/dashboard/challenge/${t.challengeId}`)} style={{ background: "#F6F5FB", borderRadius: 14, padding: 14 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: "#14132B" }}>{t.name}</span>
-                    {isLeader && <span style={{ fontSize: 10, fontWeight: 700, background: "#FEF3C7", color: "#92400E", padding: "3px 8px", borderRadius: 20 }}>👑 Leader</span>}
+          {teams.length === 0 ? (
+            <p style={{ fontSize: 13, color: "rgba(20,19,43,0.4)" }}>You're not part of any team yet.</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+              {teams.map((t: any) => {
+                const isLeader = t.leaderId === currentUserId;
+                return (
+                  <div key={t.id} className="team-tile" onClick={() => router.push(`/dashboard/challenge/${t.challengeId}`)} style={{ background: "#F6F5FB", borderRadius: 14, padding: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: "#14132B" }}>{t.name}</span>
+                      {isLeader && <span style={{ fontSize: 10, fontWeight: 700, background: "#FEF3C7", color: "#92400E", padding: "3px 8px", borderRadius: 20 }}>👑 Leader</span>}
+                    </div>
+                    <AvatarStack members={t.members.map((m: any) => ({ name: m.user?.name || m.name || "?", image: m.user?.image }))} max={4} />
+                    <p style={{ fontSize: 11.5, color: "rgba(20,19,43,0.4)", marginTop: 8 }}>{t.challenge.title} — click to open</p>
                   </div>
-                  <AvatarStack count={t.members.length} max={4} />
-                  <p style={{ fontSize: 11.5, color: "rgba(20,19,43,0.4)", marginTop: 8 }}>{t.challenge.title} — click to open</p>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Followers / Following modal */}
+      {showFollowModal && (
+        <div onClick={() => setShowFollowModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,19,43,0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: 24, width: 400, maxHeight: "78vh", overflowY: "auto", animation: "popModalT 0.3s cubic-bezier(.2,.8,.2,1)", boxShadow: "0 30px 60px rgba(20,19,43,0.25)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => setFollowTab("followers")} style={{ padding: "7px 16px", borderRadius: 20, border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", background: followTab === "followers" ? "linear-gradient(135deg,#6D4AFF,#8B5CF6)" : "rgba(20,19,43,0.05)", color: followTab === "followers" ? "#fff" : "rgba(20,19,43,0.6)" }}>
+                  Followers ({followers.length})
+                </button>
+                <button onClick={() => setFollowTab("following")} style={{ padding: "7px 16px", borderRadius: 20, border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", background: followTab === "following" ? "linear-gradient(135deg,#6D4AFF,#8B5CF6)" : "rgba(20,19,43,0.05)", color: followTab === "following" ? "#fff" : "rgba(20,19,43,0.6)" }}>
+                  Following ({following.length})
+                </button>
+              </div>
+              <button onClick={() => setShowFollowModal(false)} style={{ background: "rgba(20,19,43,0.05)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer", flexShrink: 0 }}>✕</button>
+            </div>
+
+            {followLoading ? (
+              <p style={{ textAlign: "center", padding: 30, color: "rgba(20,19,43,0.4)", fontSize: 13 }}>Loading...</p>
+            ) : (followTab === "followers" ? followers : following).length === 0 ? (
+              <p style={{ textAlign: "center", padding: 30, color: "rgba(20,19,43,0.4)", fontSize: 13 }}>{followTab === "followers" ? "No followers yet." : "Not following anyone yet."}</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {(followTab === "followers" ? followers : following).map((u: any) => (
+                  <div key={u.id} onClick={() => setViewingUsername(u.username)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 12, background: "#F6F5FB", cursor: "pointer" }}>
+                    {u.image ? (
+                      <img src={u.image} alt={u.name} style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15, flexShrink: 0 }}>
+                        {u.name[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#14132B" }}>{u.name}</div>
+                      <div style={{ fontSize: 12, color: "rgba(20,19,43,0.45)" }}>@{u.username}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      {viewingUsername && <ProfileModal username={viewingUsername} onClose={() => setViewingUsername(null)} />}
 
       {/* Wins modal */}
       {showWinsModal && (
@@ -743,8 +847,8 @@ async function handleBadgeClick(a: any, earned: boolean) {
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: 26, width: 460, maxHeight: "80vh", overflowY: "auto", animation: "popModalT 0.3s cubic-bezier(.2,.8,.2,1)", boxShadow: "0 30px 60px rgba(20,19,43,0.25)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 18, fontWeight: 700, color: "#14132B" }}>
-  {activeAchievement?.type === "position" ? `${activeAchievement.title} (${wins.length})` : `🏆 Wins (${wins.length})`}
-</h2>
+                {activeAchievement?.type === "position" ? `${activeAchievement.title} (${wins.length})` : `🏆 Wins (${wins.length})`}
+              </h2>
               <button onClick={() => setShowWinsModal(false)} style={{ background: "rgba(20,19,43,0.05)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer" }}>✕</button>
             </div>
             {winsLoading ? (
@@ -760,9 +864,7 @@ async function handleBadgeClick(a: any, earned: boolean) {
                       <span style={{ fontSize: 26 }}>{medal}</span>
                       <div style={{ flex: 1 }}>
                         <p style={{ fontSize: 13.5, fontWeight: 700, color: "#14132B" }}>{w.challenge.title}</p>
-                        <p style={{ fontSize: 12, color: "rgba(20,19,43,0.5)" }}>
-                          {w.position === 1 ? "1st" : w.position === 2 ? "2nd" : "3rd"} place · {new Date(w.announcedAt).toLocaleDateString()}
-                        </p>
+                        <p style={{ fontSize: 12, color: "rgba(20,19,43,0.5)" }}>{w.position === 1 ? "1st" : w.position === 2 ? "2nd" : "3rd"} place · {new Date(w.announcedAt).toLocaleDateString()}</p>
                       </div>
                       {w.challenge.prize && <span style={{ fontSize: 12.5, fontWeight: 700, color: "#D97706" }}>{w.challenge.prize}</span>}
                     </div>
@@ -774,15 +876,13 @@ async function handleBadgeClick(a: any, earned: boolean) {
         </div>
       )}
 
-      {/* Submissions modal (for completion-count badges) */}
+      {/* Submissions modal */}
       {showSubsModal && (
         <div onClick={() => setShowSubsModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,19,43,0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: 26, width: 460, maxHeight: "80vh", overflowY: "auto", animation: "popModalT 0.3s cubic-bezier(.2,.8,.2,1)", boxShadow: "0 30px 60px rgba(20,19,43,0.25)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 18, fontWeight: 700, color: "#14132B" }}>
-                {activeAchievement?.icon && (
-                  <img src={activeAchievement.icon} alt="" style={{ width: 24, height: 24, borderRadius: "50%", display: "inline-block", marginRight: 8, verticalAlign: "middle" }} />
-                )}
+                {activeAchievement?.icon && <img src={activeAchievement.icon} alt="" style={{ width: 24, height: 24, borderRadius: "50%", display: "inline-block", marginRight: 8, verticalAlign: "middle" }} />}
                 {activeAchievement?.title} ({submissions.length})
               </h2>
               <button onClick={() => setShowSubsModal(false)} style={{ background: "rgba(20,19,43,0.05)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer" }}>✕</button>
@@ -819,27 +919,27 @@ async function handleBadgeClick(a: any, earned: boolean) {
                 className="avatar-upload"
                 onClick={() => fileRef.current?.click()}
                 style={{
-                  width: 76,
-                  height: 76,
-                  borderRadius: "50%",
+                  width: 76, height: 76, borderRadius: "50%",
                   background: avatar ? "transparent" : "linear-gradient(135deg,#6D4AFF,#8B5CF6)",
-                  margin: "0 auto 8px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fff",
-                  fontSize: 28,
-                  fontWeight: 700,
-                  overflow: "hidden",
-                  border: "3px solid #F6F5FB",
+                  margin: "0 auto 8px", display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff", fontSize: 28, fontWeight: 700, overflow: "hidden", border: "3px solid #F6F5FB",
                 }}
               >
                 {avatar ? <img src={avatar} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : user.name[0]?.toUpperCase()}
               </div>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAvatarChange} />
-              <span onClick={() => fileRef.current?.click()} style={{ fontSize: 12, color: "#6D4AFF", fontWeight: 600, cursor: "pointer" }}>
-                Change Photo
-              </span>
+              <span onClick={() => fileRef.current?.click()} style={{ fontSize: 12, color: "#6D4AFF", fontWeight: 600, cursor: "pointer" }}>Change Photo</span>
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(20,19,43,0.5)", marginBottom: 8, display: "block" }}>Name</label>
+              <input className="prof-input" style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" />
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(20,19,43,0.5)", marginBottom: 8, display: "block" }}>Username</label>
+              <input className="prof-input" style={inputStyle} value={username} onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))} placeholder="username" />
+              <p style={{ fontSize: 11, color: "rgba(20,19,43,0.4)", marginTop: 5 }}>Letters, numbers, underscore only. Must be unique.</p>
             </div>
 
             <div style={{ marginBottom: 18 }}>
@@ -898,18 +998,73 @@ async function handleBadgeClick(a: any, earned: boolean) {
 
             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
               {saved && <span style={{ fontSize: 13, color: "#15803D", fontWeight: 700 }}>✓ Saved</span>}
-              <button
-                className="btn-anim"
-                onClick={save}
-                disabled={saving}
-                style={{ background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff", border: "none", borderRadius: 12, padding: "12px 26px", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: saving ? 0.6 : 1 }}
-              >
+              <button className="btn-anim" onClick={save} disabled={saving} style={{ background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff", border: "none", borderRadius: 12, padding: "12px 26px", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>
                 {saving ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function MoneyStatCard({ icon, label, value, tone, grad }: { icon: string; label: string; value: number; tone: string; grad: string }) {
+  const [displayVal, setDisplayVal] = useState(0);
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    const duration = 900;
+    const start = performance.now();
+    function tick(now: number) {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayVal(Math.round(eased * value));
+      if (progress < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }, [value]);
+
+  return (
+    <div
+      className="profile-stat-card"
+      style={{
+        background: grad,
+        borderRadius: 18,
+        padding: "18px 16px",
+        border: "1px solid rgba(255,255,255,0.5)",
+        boxShadow: "0 4px 16px rgba(20,19,43,0.06)",
+        transformStyle: "preserve-3d",
+      }}
+      onMouseMove={(e) => {
+        const el = e.currentTarget;
+        const rect = el.getBoundingClientRect();
+        const px = (e.clientX - rect.left) / rect.width;
+        const py = (e.clientY - rect.top) / rect.height;
+        const rx = (0.5 - py) * 32;
+        const ry = (px - 0.5) * 32;
+        el.style.transform = `perspective(500px) rotateX(${rx}deg) rotateY(${ry}deg) scale(1.08) translateY(-14px)`;
+        el.style.boxShadow = `0 36px 60px ${tone}44`;
+        el.style.zIndex = "10";
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget;
+        el.style.transform = "perspective(500px) rotateX(0deg) rotateY(0deg) scale(1) translateY(0)";
+        el.style.boxShadow = "0 4px 16px rgba(20,19,43,0.06)";
+        el.style.zIndex = "1";
+      }}
+    >
+      <div className="profile-stat-shine" />
+      <div style={{ position: "absolute", top: -20, right: -20, width: 70, height: 70, borderRadius: "50%", background: `${tone}22`, filter: "blur(2px)" }} />
+      <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.85)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, marginBottom: 12, position: "relative", boxShadow: `0 3px 10px ${tone}33` }}>
+        {icon}
+      </div>
+      <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 22, fontWeight: 800, color: tone, position: "relative", fontVariantNumeric: "tabular-nums" }}>
+        Rs. {displayVal.toLocaleString()}
+      </div>
+      <div style={{ fontSize: 11.5, color: "rgba(20,19,43,0.55)", fontWeight: 700, marginTop: 3, position: "relative" }}>{label}</div>
     </div>
   );
 }
@@ -933,29 +1088,41 @@ function StatCard({ icon, label, value, tone, grad }: { icon: string; label: str
   }, [value]);
 
   return (
-    <TiltCard intensity={5} glow={`${tone}44`} style={{ background: grad, borderRadius: 18, padding: "18px 16px", border: "1px solid rgba(255,255,255,0.4)", position: "relative", overflow: "hidden" }}>
+    <div
+      className="profile-stat-card"
+      style={{
+        background: grad,
+        borderRadius: 18,
+        padding: "18px 16px",
+        border: "1px solid rgba(255,255,255,0.5)",
+        boxShadow: "0 4px 16px rgba(20,19,43,0.06)",
+        transformStyle: "preserve-3d",
+      }}
+      onMouseMove={(e) => {
+        const el = e.currentTarget;
+        const rect = el.getBoundingClientRect();
+        const px = (e.clientX - rect.left) / rect.width;
+        const py = (e.clientY - rect.top) / rect.height;
+        const rx = (0.5 - py) * 32;
+        const ry = (px - 0.5) * 32;
+        el.style.transform = `perspective(500px) rotateX(${rx}deg) rotateY(${ry}deg) scale(1.08) translateY(-14px)`;
+        el.style.boxShadow = `0 36px 60px ${tone}44`;
+        el.style.zIndex = "10";
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget;
+        el.style.transform = "perspective(500px) rotateX(0deg) rotateY(0deg) scale(1) translateY(0)";
+        el.style.boxShadow = "0 4px 16px rgba(20,19,43,0.06)";
+        el.style.zIndex = "1";
+      }}
+    >
+      <div className="profile-stat-shine" />
       <div style={{ position: "absolute", top: -20, right: -20, width: 70, height: 70, borderRadius: "50%", background: `${tone}22`, filter: "blur(2px)" }} />
-      <div
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 10,
-          background: "rgba(255,255,255,0.7)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 16,
-          marginBottom: 12,
-          position: "relative",
-          boxShadow: `0 4px 12px ${tone}33`,
-        }}
-      >
+      <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.85)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, marginBottom: 12, position: "relative", boxShadow: `0 3px 10px ${tone}33` }}>
         {icon}
       </div>
-      <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 800, color: tone, position: "relative", fontVariantNumeric: "tabular-nums" }}>
-        {displayVal}
-      </div>
+      <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 800, color: tone, position: "relative", fontVariantNumeric: "tabular-nums" }}>{displayVal}</div>
       <div style={{ fontSize: 11.5, color: "rgba(20,19,43,0.55)", fontWeight: 700, marginTop: 3, position: "relative" }}>{label}</div>
-    </TiltCard>
+    </div>
   );
 }

@@ -22,6 +22,23 @@ function AnimatedCount({ value }: { value: number }) {
   return <>{display}</>;
 }
 
+const ORG_GRADIENTS = [
+  "linear-gradient(135deg,#DC2626,#EF4444)",
+  "linear-gradient(135deg,#6D4AFF,#8B5CF6)",
+  "linear-gradient(135deg,#15803D,#22C55E)",
+  "linear-gradient(135deg,#D97706,#F59E0B)",
+  "linear-gradient(135deg,#2563EB,#3B82F6)",
+  "linear-gradient(135deg,#A21CAF,#C026D3)",
+  "linear-gradient(135deg,#DB2777,#EC4899)",
+  "linear-gradient(135deg,#047857,#059669)",
+];
+
+function getOrgTheme(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return ORG_GRADIENTS[hash % ORG_GRADIENTS.length];
+}
+
 function useEscapeKey(onEscape: () => void, active: boolean) {
   useEffect(() => {
     if (!active) return;
@@ -310,12 +327,18 @@ export default function VerifyOrganizers() {
         <p style={{ color: "rgba(20,19,43,0.5)", fontSize: 14 }}>Review and approve organizations before they can publish live challenges.</p>
       </div>
 
-      <div className="vo-head" style={{ background: "linear-gradient(135deg,#14132B,#3B2E7A)", borderRadius: 18, padding: "18px 22px", marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+
+
+      <div className="vo-head" style={{ background: "#fff", border: "1px solid rgba(15,23,42,0.07)", borderRadius: 18, padding: "18px 22px", marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 22 }}>✨</span>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(109,74,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#6D4AFF", flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
+            </svg>
+          </div>
           <div>
-            <p style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>AI Review (Platform Feature)</p>
-            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Lets organizers pay to unlock AI-assisted submission scoring</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: "#14132B" }}>AI Review (Platform Feature)</p>
+            <p style={{ fontSize: 12, color: "rgba(20,19,43,0.5)" }}>Lets organizers pay to unlock AI-assisted submission scoring</p>
           </div>
         </div>
         <button
@@ -324,7 +347,7 @@ export default function VerifyOrganizers() {
           aria-label="Toggle AI Review feature"
           style={{
             width: 52, height: 28, borderRadius: 20, border: "none", cursor: "pointer", position: "relative",
-            background: aiReviewEnabled ? "linear-gradient(135deg,#16A34A,#15803D)" : "rgba(255,255,255,0.15)",
+            background: aiReviewEnabled ? "linear-gradient(135deg,#16A34A,#15803D)" : "rgba(15,23,42,0.12)",
             transition: "background 0.2s ease", opacity: flagBusy ? 0.6 : 1,
           }}
         >
@@ -335,22 +358,42 @@ export default function VerifyOrganizers() {
         </button>
       </div>
 
+
+
       <div className="vo-head vo-stats-grid">
-        <div className="vo-stat" style={{ background: "linear-gradient(150deg,#FEE2E2,#FEF2F2)", borderRadius: 18, padding: "20px 20px", border: "1px solid rgba(255,255,255,0.6)" }}>
-          <div className="vo-orb" style={{ background: "radial-gradient(circle, rgba(220,38,38,0.15), transparent 70%)" }} />
-          <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#B91C1C", opacity: 0.8 }}>Pending Verification</p>
-            <span style={{ fontSize: 20 }}>⏳</span>
+        <div
+          className="vo-stat"
+          style={{
+            background: pendingCount > 0 ? "linear-gradient(135deg,#FCA5A5,#F87171)" : "linear-gradient(135deg,#E5E7EB,#F3F4F6)",
+            borderRadius: 18,
+            padding: "20px 20px",
+            border: "1px solid rgba(255,255,255,0.5)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: pendingCount > 0 ? "#7F1D1D" : "#374151", opacity: 0.85 }}>Pending Verification</p>
+            <div style={{ width: 30, height: 30, borderRadius: 9, background: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center", color: pendingCount > 0 ? "#B91C1C" : "#6B7280" }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M12 7v5l3.5 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
           </div>
-          <p style={{ position: "relative", fontFamily: "'Sora', sans-serif", fontSize: 32, fontWeight: 800, color: "#B91C1C" }}><AnimatedCount value={pendingCount} /></p>
+          <p style={{ fontFamily: "'Sora', sans-serif", fontSize: 32, fontWeight: 800, color: pendingCount > 0 ? "#7F1D1D" : "#374151" }}>
+            <AnimatedCount value={pendingCount} />
+          </p>
         </div>
-        <div className="vo-stat" style={{ background: "linear-gradient(150deg,#D1FAE5,#F0FDF4)", borderRadius: 18, padding: "20px 20px", border: "1px solid rgba(255,255,255,0.6)" }}>
-          <div className="vo-orb" style={{ background: "radial-gradient(circle, rgba(22,163,74,0.15), transparent 70%)" }} />
-          <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#166534", opacity: 0.8 }}>Verified Organizers</p>
-            <span style={{ fontSize: 20 }}>✅</span>
+        <div className="vo-stat" style={{ background: "linear-gradient(135deg,#6EE7B7,#34D399)", borderRadius: 18, padding: "20px 20px", border: "1px solid rgba(255,255,255,0.5)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#064E3B", opacity: 0.85 }}>Verified Organizers</p>
+            <div style={{ width: 30, height: 30, borderRadius: 9, background: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center", color: "#047857" }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
           </div>
-          <p style={{ position: "relative", fontFamily: "'Sora', sans-serif", fontSize: 32, fontWeight: 800, color: "#166534" }}><AnimatedCount value={verifiedCount} /></p>
+          <p style={{ fontFamily: "'Sora', sans-serif", fontSize: 32, fontWeight: 800, color: "#064E3B" }}>
+            <AnimatedCount value={verifiedCount} />
+          </p>
         </div>
       </div>
 
@@ -364,7 +407,7 @@ export default function VerifyOrganizers() {
             key={t.key}
             className="vo-tab"
             onClick={() => setFilter(t.key as any)}
-            style={{ padding: "8px 16px", borderRadius: 20, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: filter === t.key ? "linear-gradient(135deg,#14132B,#3B2E7A)" : "rgba(20,19,43,0.05)", color: filter === t.key ? "#fff" : "rgba(20,19,43,0.6)" }}
+                        style={{ padding: "8px 16px", borderRadius: 20, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: filter === t.key ? "#6D4AFF" : "rgba(20,19,43,0.05)", color: filter === t.key ? "#fff" : "rgba(20,19,43,0.6)" }}
           >
             {t.label}
           </button>
@@ -461,9 +504,18 @@ export default function VerifyOrganizers() {
               <div className="vo-row-inner">
                 <div className="vo-row-left">
                   <input type="checkbox" className="vo-check" checked={selected.has(o.id)} onChange={() => toggleSelect(o.id)} aria-label={`Select ${o.orgName}`} />
-                  <div className="vo-logo" style={{ width: 42, height: 42, borderRadius: 12, background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, flexShrink: 0 }}>
-                    {o.orgName?.[0]?.toUpperCase()}
-                  </div>
+                                   {o.user?.image ? (
+                    <img
+                      src={o.user.image}
+                      alt={o.orgName}
+                      className="vo-logo"
+                      style={{ width: 42, height: 42, borderRadius: 12, objectFit: "cover", flexShrink: 0, boxShadow: "0 4px 10px rgba(20,19,43,0.15)" }}
+                    />
+                  ) : (
+                    <div className="vo-logo" style={{ width: 42, height: 42, borderRadius: 12, background: getOrgTheme(o.id), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, flexShrink: 0, boxShadow: "0 4px 10px rgba(20,19,43,0.15)" }}>
+                      {o.orgName?.[0]?.toUpperCase()}
+                    </div>
+                  )}
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 14.5, fontWeight: 700, color: "#14132B" }}>{o.orgName}</span>

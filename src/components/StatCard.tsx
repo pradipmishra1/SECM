@@ -15,11 +15,11 @@ export default function StatCard({
   subtext?: string;
   tone?: "violet" | "amber" | "green" | "blue";
 }) {
-  const themes = {
-    violet: { grad: "linear-gradient(155deg,#EDE9FE,#F5F3FF)", accent: "#6D4AFF", text: "#4C2FCC", glow: "rgba(109,74,255,0.3)" },
-    amber: { grad: "linear-gradient(155deg,#FEF3C7,#FFFBEB)", accent: "#D97706", text: "#92400E", glow: "rgba(217,119,6,0.3)" },
-    green: { grad: "linear-gradient(155deg,#DCFCE7,#F0FDF4)", accent: "#16A34A", text: "#166534", glow: "rgba(22,163,74,0.3)" },
-    blue: { grad: "linear-gradient(155deg,#DBEAFE,#EFF6FF)", accent: "#2563EB", text: "#1E40AF", glow: "rgba(37,99,235,0.3)" },
+   const themes = {
+    violet: { grad: "linear-gradient(155deg,#C4B5FD,#DDD6FE)", accent: "#6D28D9", text: "#4C1D95", glow: "rgba(109,74,255,0.4)" },
+    amber: { grad: "linear-gradient(155deg,#FDE68A,#FEF08A)", accent: "#B45309", text: "#78350F", glow: "rgba(217,119,6,0.4)" },
+    green: { grad: "linear-gradient(155deg,#86EFAC,#BBF7D0)", accent: "#15803D", text: "#14532D", glow: "rgba(22,163,74,0.4)" },
+    blue: { grad: "linear-gradient(155deg,#93C5FD,#BFDBFE)", accent: "#1D4ED8", text: "#1E3A8A", glow: "rgba(37,99,235,0.4)" },
   }[tone];
 
   const numeric = typeof value === "number" ? value : parseInt(String(value)) || 0;

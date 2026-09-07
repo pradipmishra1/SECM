@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+import { createNotification } from "@/lib/notifications";
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {  const { id } = await params;
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
@@ -61,6 +60,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         })
       )
     );
+  }
+
+  const submission = await prisma.submission.findUnique({
+    where: { id },
+    include: { challenge: { select: { title: true } }, team: { include: { members: true } } },
+  });
+  if (submission) {
+    const recipients = submission.userId
+      ? [submission.userId]
+      : (submission.team?.members.map((m) => m.userId) || []);
+    for (const recipientId of recipients) {
+      await createNotification({
+        userId: recipientId,
+        type: "SUBMISSION_REVIEWED",
+        title: "Submission reviewed",
+        message: `Your submission for "${submission.challenge.title}" was reviewed — Score: ${finalScore}/10`,
+        link: "/dashboard/submissions",
+      });
+    }
   }
 
   return NextResponse.json({ review });
