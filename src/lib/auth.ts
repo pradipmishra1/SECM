@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { emailOTP } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -17,7 +18,7 @@ export const auth = betterAuth({
     provider: "postgresql",
   }),
   emailVerification: {
-    sendOnSignUp: true,
+    sendOnSignUp: false,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
       await transporter.sendMail({
@@ -41,8 +42,9 @@ export const auth = betterAuth({
       });
     },
   },
-  emailAndPassword: {
+   emailAndPassword: {
     enabled: true,
+    requireEmailVerification: true,
     sendResetPassword: async ({ user, url }) => {
       await transporter.sendMail({
         from: `"SECM" <${process.env.GMAIL_USER}>`,
@@ -65,12 +67,55 @@ export const auth = betterAuth({
       });
     },
   },
-  socialProviders: {
+      socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     },
+      github: {
+      clientId: process.env.GITHUB_CLIENT_ID as string,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
+    },
+    linkedin: {
+      clientId: process.env.LINKEDIN_CLIENT_ID as string,
+      clientSecret: process.env.LINKEDIN_CLIENT_SECRET as string,
+    },
   },
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google", "github", "linkedin"],
+      allowDifferentEmails: true,
+    },
+  },
+  plugins: [
+    emailOTP({
+      otpLength: 6,
+      expiresIn: 600,
+      sendVerificationOTP: async ({ email, otp, type }) => {
+        if (type !== "email-verification") return;
+        await transporter.sendMail({
+          from: `"SECM" <${process.env.GMAIL_USER}>`,
+          to: email,
+          subject: "Your SECM verification code",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+              <h2 style="color:#14132B; margin-bottom: 8px;">Verify your email</h2>
+              <p style="color:#555; font-size:14px; line-height:1.6;">
+                Welcome to SECM! Enter this code to verify your email and activate your account:
+              </p>
+              <div style="background:#F6F5FB; border-radius:10px; padding:18px; text-align:center; margin-top:16px;">
+                <span style="font-size:32px; font-weight:800; letter-spacing:8px; color:#6D4AFF;">${otp}</span>
+              </div>
+              <p style="color:#999; font-size:12px; margin-top:24px;">
+                This code expires in 10 minutes. If you didn't create this account, you can safely ignore this email.
+              </p>
+            </div>
+          `,
+        });
+      },
+    }),
+  ],
   user: {
   additionalFields: {
     role: {

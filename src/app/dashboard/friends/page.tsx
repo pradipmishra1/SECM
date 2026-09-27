@@ -13,16 +13,16 @@ export default async function FriendsPage({
   if (!session) redirect("/login");
   const user = session.user as any;
   const { tab } = await searchParams;
-  const initialTab = ["requests", "friends", "followers", "following"].includes(tab || "")
-    ? (tab as "requests" | "friends" | "followers" | "following")
+   const initialTab = ["friends", "followers", "following"].includes(tab || "")
+    ? (tab as "friends" | "followers" | "following")
     : undefined;
   return (
     <DashboardLayout role={user.role} userName={user.name} userImage={user.image}>
       <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, color: "#14132B", marginBottom: 6 }}>
         Friends
       </h1>
-      <p style={{ color: "rgba(20,19,43,0.5)", fontSize: 14, marginBottom: 24 }}>
-        Manage friend requests and message your friends directly.
+           <p style={{ color: "rgba(20,19,43,0.5)", fontSize: 14, marginBottom: 24 }}>
+        See who you're mutually following and message them directly.
       </p>
       <FriendsManager initialTab={initialTab} />
     </DashboardLayout>

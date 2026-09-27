@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
 import TiltCard from "./TiltCard";
 import AvatarStack from "./AvatarStack";
 import ProfileModal from "./ProfileModal";
@@ -95,8 +96,19 @@ export default function ProfileEditor({
   recentChallenges?: any[];
   currentUserId?: string;
 }) {
-  const router = useRouter();
+   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>("overview");
+   const [githubSyncing, setGithubSyncing] = useState(false);
+  const [linkedinConnected, setLinkedinConnected] = useState(false);
+  const [linkedinSyncing, setLinkedinSyncing] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/profile/sync-linkedin")
+      .then((r) => r.json())
+      .then((d) => setLinkedinConnected(!!d.connected))
+      .catch(() => {});
+  }, []);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user.name || "");
   const [username, setUsername] = useState(user.username || "");
@@ -105,7 +117,9 @@ export default function ProfileEditor({
   const [skills, setSkills] = useState<string[]>(studentProfile?.skills || []);
   const [skillInput, setSkillInput] = useState("");
   const [orgName, setOrgName] = useState(organizerProfile?.orgName || "");
-  const [portfolioUrl, setPortfolioUrl] = useState(studentProfile?.portfolioUrl || "");
+   const [portfolioUrl, setPortfolioUrl] = useState(studentProfile?.portfolioUrl || "");
+  const [githubUrl, setGithubUrl] = useState(studentProfile?.githubUrl || organizerProfile?.githubUrl || "");
+  const [linkedinUrl, setLinkedinUrl] = useState(studentProfile?.linkedinUrl || organizerProfile?.linkedinUrl || "");
   const [bannerText, setBannerText] = useState(studentProfile?.bannerText || "");
   const [avatar, setAvatar] = useState<string | null>(user.image || null);
   const [saving, setSaving] = useState(false);
@@ -129,8 +143,51 @@ export default function ProfileEditor({
   const [viewingUsername, setViewingUsername] = useState<string | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const [copied, setCopied] = useState(false);
+   const [copied, setCopied] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
+  const [connectSaving, setConnectSaving] = useState(false);
+  const [connectSaved, setConnectSaved] = useState(false);
+
+  async function saveConnections() {
+    setConnectSaving(true);
+    const res = await fetch("/api/profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ githubUrl, linkedinUrl }),
+    });
+    setConnectSaving(false);
+    if (res.ok) {
+      setConnectSaved(true);
+      router.refresh();
+      setTimeout(() => setConnectSaved(false), 2000);
+    }
+  }
   const [rank, setRank] = useState<number | null>(null);
+
+   useEffect(() => {
+       if (searchParams.get("linked") === "github") {
+      setGithubSyncing(true);
+      fetch("/api/profile/sync-github", { method: "POST" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.githubUrl) setGithubUrl(d.githubUrl);
+          setGithubSyncing(false);
+          router.replace(window.location.pathname);
+        })
+        .catch(() => setGithubSyncing(false));
+    }
+    if (searchParams.get("linked") === "linkedin") {
+      setLinkedinSyncing(true);
+      fetch("/api/profile/sync-linkedin", { method: "POST" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.connected) setLinkedinConnected(true);
+          setLinkedinSyncing(false);
+          router.replace(window.location.pathname);
+        })
+        .catch(() => setLinkedinSyncing(false));
+    }
+  }, []);
 
   useEffect(() => {
     if (role === "STUDENT" && user.username) {
@@ -211,7 +268,7 @@ export default function ProfileEditor({
     setSaving(true);
     setSaved(false);
     setError("");
-    const res = await fetch("/api/profile", {
+      const res = await fetch("/api/profile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -223,6 +280,8 @@ export default function ProfileEditor({
         interests: studentProfile?.interests || [],
         orgName,
         portfolioUrl,
+        githubUrl,
+        linkedinUrl,
         bannerText,
         avatar,
       }),
@@ -407,9 +466,9 @@ export default function ProfileEditor({
             <div
               className="avatar-upload"
               style={{
-                width: 112,
-                height: 112,
-                borderRadius: 26,
+                width: 116,
+                height: 116,
+                borderRadius: 30,
                 background: avatar ? "transparent" : "linear-gradient(135deg,#6D4AFF,#8B5CF6)",
                 border: "4px solid #fff",
                 display: "flex",
@@ -448,24 +507,69 @@ export default function ProfileEditor({
         </div>
 
           <div className="follow-stat-hover" onClick={() => openFollowModal("followers")} style={{ textAlign: "center" }}>
-            <div className="stat-number-anim" style={{ fontFamily: "'Sora', sans-serif", fontSize: 18, fontWeight: 800, color: "#14132B" }}>{stats?.followerCount ?? 0}</div>
-            <div style={{ fontSize: 11, color: "rgba(20,19,43,0.45)", fontWeight: 600 }}>Followers</div>
+            <div className="stat-number-anim" style={{ fontFamily: "'Sora', sans-serif", fontSize: 28, fontWeight: 800, color: "#14132B" }}>{stats?.followerCount ?? 0}</div>
+            <div style={{ fontSize: 18, color: "rgba(20,19,43,0.45)", fontWeight: 600 }}>Followers</div>
           </div>
           <div className="follow-stat-hover" onClick={() => openFollowModal("following")} style={{ textAlign: "center" }}>
-            <div className="stat-number-anim" style={{ fontFamily: "'Sora', sans-serif", fontSize: 18, fontWeight: 800, color: "#14132B", animationDelay: "0.08s" }}>{stats?.followingCount ?? 0}</div>
-            <div style={{ fontSize: 11, color: "rgba(20,19,43,0.45)", fontWeight: 600 }}>Following</div>
+            <div className="stat-number-anim" style={{ fontFamily: "'Sora', sans-serif", fontSize: 28, fontWeight: 800, color: "#14132B", animationDelay: "0.08s" }}>{stats?.followingCount ?? 0}</div>
+            <div style={{ fontSize: 18, color: "rgba(20,19,43,0.45)", fontWeight: 600 }}>Following</div>
           </div>
-          <button
+                  <button
             className="btn-anim"
             onClick={copyProfileLink}
-            style={{ background: "#fff", color: "#6D4AFF", border: "1.5px solid rgba(109,74,255,0.25)", borderRadius: 10, padding: "9px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+            style={{ background: "#fff", color: "#6D4AFF", border: "1.5px solid rgba(109,74,255,0.25)", borderRadius: 10, padding: "9px 16px", fontSize: 18, fontWeight: 700, cursor: "pointer" }}
           >
             {copied ? "✓ Copied!" : "🔗 Share"}
           </button>
+                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {githubUrl ? (
+              
+               <a href={githubUrl}
+                target="_blank"
+                rel="noreferrer"
+                title="GitHub"
+                className="btn-anim"
+                style={{ width: 50, height: 50, borderRadius: 10, background: "#14132B", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", textDecoration: "none" }}
+              >
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.83 1.18 3.08 0 4.41-2.7 5.38-5.27 5.67.42.36.78 1.07.78 2.16 0 1.56-.01 2.82-.01 3.2 0 .3.2.66.79.55A10.52 10.52 0 0 0 23.5 12c0-6.35-5.15-11.5-11.5-11.5Z"/></svg>
+              </a>
+            ) : (
+              <button
+                onClick={() => setShowConnectModal(true)}
+                title="Connect GitHub"
+                className="btn-anim"
+                style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(20,19,43,0.06)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(20,19,43,0.35)", cursor: "pointer", fontSize: 18 }}
+              >
+                +
+              </button>
+            )}
+
+            {linkedinUrl ? (
+              
+               <a href={linkedinUrl}
+                target="_blank"
+                rel="noreferrer"
+                title="LinkedIn"
+                className="btn-anim"
+                style={{ width: 50, height: 50, borderRadius: 10, background: "#0A66C2", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", textDecoration: "none" }}
+              >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.03-1.85-3.03-1.85 0-2.14 1.45-2.14 2.94v5.66H9.36V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45z"/></svg>
+              </a>
+            ) : (
+              <button
+                onClick={() => setShowConnectModal(true)}
+                title="Connect LinkedIn"
+                className="btn-anim"
+                style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(20,19,43,0.06)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(20,19,43,0.35)", cursor: "pointer", fontSize: 18 }}
+              >
+                +
+              </button>
+            )}
+          </div>
                                         <button
             className="btn-anim"
             onClick={() => setEditing(true)}
-            style={{ background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff", border: "none", borderRadius: 10, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 6px 16px rgba(109,74,255,0.3)" }}
+            style={{ background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff", border: "none", borderRadius: 10, padding: "9px 20px", fontSize: 20, fontWeight: 700, cursor: "pointer", boxShadow: "0 6px 16px rgba(109,74,255,0.3)" }}
           >
             ✏️ Edit Profile
           </button>
@@ -515,6 +619,13 @@ export default function ProfileEditor({
               <h3 style={cardTitle}>👤 About Me</h3>
 
               {role === "ORGANIZER" && (
+
+
+
+
+
+
+
                 <div style={{ marginBottom: 16 }}>
                   <p style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Organization</p>
                   <p style={{ fontSize: 14, color: "#14132B", fontWeight: 600 }}>{orgName || "Not set"}</p>
@@ -905,6 +1016,135 @@ export default function ProfileEditor({
         </div>
       )}
 
+            {/* Connect modal */}
+      {showConnectModal && (
+        <div onClick={() => setShowConnectModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,19,43,0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: 28, width: 420, boxShadow: "0 30px 60px rgba(20,19,43,0.25)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 18, fontWeight: 700, color: "#14132B" }}>🔌 Connect Socials</h2>
+              <button onClick={() => setShowConnectModal(false)} style={{ background: "rgba(20,19,43,0.05)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer" }}>✕</button>
+            </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(20,19,43,0.5)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.83 1.18 3.08 0 4.41-2.7 5.38-5.27 5.67.42.36.78 1.07.78 2.16 0 1.56-.01 2.82-.01 3.2 0 .3.2.66.79.55A10.52 10.52 0 0 0 23.5 12c0-6.35-5.15-11.5-11.5-11.5Z"/></svg>
+                GitHub
+              </label>
+              {githubUrl ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F6F5FB", borderRadius: 10, padding: "10px 14px" }}>
+                  <a href={githubUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#14132B", fontWeight: 600, textDecoration: "none" }}>
+                    {githubUrl.replace("https://github.com/", "@")}
+                  </a>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#15803D", background: "rgba(22,163,74,0.1)", padding: "3px 9px", borderRadius: 20 }}>Connected</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setGithubSyncing(true);
+                        await fetch("/api/profile/disconnect-github", { method: "POST" });
+                        setGithubUrl("");
+                        setGithubSyncing(false);
+                        router.refresh();
+                      }}
+                      disabled={githubSyncing}
+                      style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", background: "rgba(220,38,38,0.08)", border: "none", padding: "3px 9px", borderRadius: 20, cursor: "pointer" }}
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => authClient.linkSocial({ provider: "github", callbackURL: `${window.location.pathname}?linked=github` })}
+                  disabled={githubSyncing}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    background: "#14132B", color: "#fff", border: "none", borderRadius: 10, padding: "11px 14px",
+                    fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: githubSyncing ? 0.6 : 1,
+                  }}
+                >
+                  {githubSyncing ? "Connecting..." : "Connect GitHub"}
+                </button>
+              )}
+            </div>
+
+                       <div style={{ marginBottom: 22 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(20,19,43,0.5)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.03-1.85-3.03-1.85 0-2.14 1.45-2.14 2.94v5.66H9.36V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45z"/></svg>
+                LinkedIn
+              </label>
+
+              {!linkedinConnected ? (
+                <button
+                  type="button"
+                  onClick={() => authClient.linkSocial({ provider: "linkedin", callbackURL: `${window.location.pathname}?linked=linkedin` })}
+                  disabled={linkedinSyncing}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    background: "#0A66C2", color: "#fff", border: "none", borderRadius: 10, padding: "11px 14px",
+                    fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: linkedinSyncing ? 0.6 : 1,
+                  }}
+                >
+                  {linkedinSyncing ? "Connecting..." : "Connect LinkedIn"}
+                </button>
+              ) : (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F6F5FB", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
+                    <span style={{ fontSize: 13, color: "#14132B", fontWeight: 600 }}>LinkedIn account linked</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#15803D", background: "rgba(22,163,74,0.1)", padding: "3px 9px", borderRadius: 20 }}>Connected</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setLinkedinSyncing(true);
+                          await fetch("/api/profile/disconnect-linkedin", { method: "POST" });
+                          setLinkedinConnected(false);
+                          setLinkedinUrl("");
+                          setLinkedinSyncing(false);
+                          router.refresh();
+                        }}
+                        disabled={linkedinSyncing}
+                        style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", background: "rgba(220,38,38,0.08)", border: "none", padding: "3px 9px", borderRadius: 20, cursor: "pointer" }}
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  </div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "rgba(20,19,43,0.45)", marginBottom: 6, display: "block" }}>
+                    Paste your public profile URL (LinkedIn doesn't share this automatically)
+                  </label>
+                  <input className="prof-input" style={inputStyle} value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} placeholder="https://linkedin.com/in/yourusername" />
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
+              {connectSaved && <span style={{ fontSize: 13, color: "#15803D", fontWeight: 700 }}>✓ Saved</span>}
+              <button className="btn-anim" onClick={saveConnections} disabled={connectSaving} style={{ background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff", border: "none", borderRadius: 12, padding: "11px 24px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", opacity: connectSaving ? 0.6 : 1 }}>
+                {connectSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit modal */}
       {editing && (
         <div onClick={() => setEditing(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,19,43,0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
@@ -947,18 +1187,111 @@ export default function ProfileEditor({
               <input className="prof-input" style={inputStyle} value={bannerText} onChange={(e) => setBannerText(e.target.value)} placeholder="A short line about yourself" />
             </div>
 
-            {role === "ORGANIZER" && (
+                                             {role === "ORGANIZER" && (
               <div style={{ marginBottom: 18 }}>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(20,19,43,0.5)", marginBottom: 8, display: "block" }}>Organization Name</label>
                 <input className="prof-input" style={inputStyle} value={orgName} onChange={(e) => setOrgName(e.target.value)} />
               </div>
             )}
 
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(20,19,43,0.5)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.83 1.18 3.08 0 4.41-2.7 5.38-5.27 5.67.42.36.78 1.07.78 2.16 0 1.56-.01 2.82-.01 3.2 0 .3.2.66.79.55A10.52 10.52 0 0 0 23.5 12c0-6.35-5.15-11.5-11.5-11.5Z"/></svg>
+                GitHub
+              </label>
+              {githubUrl ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F6F5FB", borderRadius: 10, padding: "10px 14px" }}>
+                  <a href={githubUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#14132B", fontWeight: 600, textDecoration: "none" }}>
+                    {githubUrl.replace("https://github.com/", "@")}
+                  </a>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#15803D", background: "rgba(22,163,74,0.1)", padding: "3px 9px", borderRadius: 20 }}>Connected</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setGithubSyncing(true);
+                        await fetch("/api/profile/disconnect-github", { method: "POST" });
+                        setGithubUrl("");
+                        setGithubSyncing(false);
+                        router.refresh();
+                      }}
+                      disabled={githubSyncing}
+                      style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", background: "rgba(220,38,38,0.08)", border: "none", padding: "3px 9px", borderRadius: 20, cursor: "pointer" }}
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => authClient.linkSocial({ provider: "github", callbackURL: `${window.location.pathname}?linked=github` })}
+                  disabled={githubSyncing}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    background: "#14132B", color: "#fff", border: "none", borderRadius: 10, padding: "11px 14px",
+                    fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: githubSyncing ? 0.6 : 1,
+                  }}
+                >
+                  {githubSyncing ? "Connecting..." : "Connect GitHub"}
+                </button>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(20,19,43,0.5)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.03-1.85-3.03-1.85 0-2.14 1.45-2.14 2.94v5.66H9.36V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45z"/></svg>
+                LinkedIn
+              </label>
+              {!linkedinConnected ? (
+                <button
+                  type="button"
+                  onClick={() => authClient.linkSocial({ provider: "linkedin", callbackURL: `${window.location.pathname}?linked=linkedin` })}
+                  disabled={linkedinSyncing}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    background: "#0A66C2", color: "#fff", border: "none", borderRadius: 10, padding: "11px 14px",
+                    fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: linkedinSyncing ? 0.6 : 1,
+                  }}
+                >
+                  {linkedinSyncing ? "Connecting..." : "Connect LinkedIn"}
+                </button>
+              ) : (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F6F5FB", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
+                    <span style={{ fontSize: 13, color: "#14132B", fontWeight: 600 }}>LinkedIn account linked</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#15803D", background: "rgba(22,163,74,0.1)", padding: "3px 9px", borderRadius: 20 }}>Connected</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setLinkedinSyncing(true);
+                          await fetch("/api/profile/disconnect-linkedin", { method: "POST" });
+                          setLinkedinConnected(false);
+                          setLinkedinUrl("");
+                          setLinkedinSyncing(false);
+                          router.refresh();
+                        }}
+                        disabled={linkedinSyncing}
+                        style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", background: "rgba(220,38,38,0.08)", border: "none", padding: "3px 9px", borderRadius: 20, cursor: "pointer" }}
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  </div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "rgba(20,19,43,0.45)", marginBottom: 6, display: "block" }}>
+                    Paste your public profile URL (LinkedIn doesn't share this automatically)
+                  </label>
+                  <input className="prof-input" style={inputStyle} value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} placeholder="https://linkedin.com/in/yourusername" />
+                </div>
+              )}
+            </div>
+
             {role === "STUDENT" && (
               <>
                 <div style={{ marginBottom: 18 }}>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(20,19,43,0.5)", marginBottom: 8, display: "block" }}>Education</label>
-                  <input className="prof-input" style={inputStyle} value={education} onChange={(e) => setEducation(e.target.value)} placeholder="e.g. BCA, 4th Semester" />
+                                   <input className="prof-input" style={inputStyle} value={education} onChange={(e) => setEducation(e.target.value)} placeholder="e.g. BCA, BSc.CSIT, BIT, BE Computer, 4th Semester" />
                 </div>
 
                 <div style={{ marginBottom: 18 }}>

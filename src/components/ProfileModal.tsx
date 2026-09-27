@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import FriendButton, { FollowButton } from "./FriendButton";
+import { FollowButton } from "./FriendButton";
 function Avatar({ src, name, size, fontSize, className, style }: { src?: string | null; name: string; size: number; fontSize: number; className?: string; style?: React.CSSProperties }) {
   const [failed, setFailed] = useState(false);
   const showImage = src && !failed;
@@ -32,6 +32,14 @@ function Avatar({ src, name, size, fontSize, className, style }: { src?: string 
     </div>
   );
 }
+
+const SKILL_COLORS = [
+  { bg: "#EDE9FE", text: "#5B21B6" },
+  { bg: "#DBEAFE", text: "#1E40AF" },
+  { bg: "#FCE7F3", text: "#9D174D" },
+  { bg: "#D1FAE5", text: "#065F46" },
+  { bg: "#FEF3C7", text: "#92400E" },
+];
 
 const ACHIEVEMENTS = [
   { icon: "/badges/first-submission.png", title: "First Submission", color: "#6D4AFF", type: "submission", threshold: 1 },
@@ -244,7 +252,7 @@ export function ProfileContent({ profile, onClose, fullPage = false }: { profile
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "5px 13px", borderRadius: 20, background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff" }}>
               {profile.role}
             </span>
-            {profile.isVerified && (
+                       {profile.isVerified && (
               <span
                 style={{
                   fontSize: 11,
@@ -261,12 +269,28 @@ export function ProfileContent({ profile, onClose, fullPage = false }: { profile
                 ✓ Verified
               </span>
             )}
+            {profile.isMutualFollow && !profile.isOwner && (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "5px 13px",
+                  borderRadius: 20,
+                  background: "rgba(22,163,74,0.1)",
+                  color: "#15803D",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                🤝 Friends
+              </span>
+            )}
           </div>
 
-                                       {!profile.isOwner && (
+                                                         {!profile.isOwner && (
             <div className="p-rise" style={{ animationDelay: "0.18s", marginTop: 14, display: "flex", gap: 8, justifyContent: "center" }}>
-                           <FriendButton targetUserId={profile.id} initialStatus={profile.friendStatus} friendshipId={profile.friendshipId} />
-              <FollowButton targetUserId={profile.id} initialIsFollowing={profile.followStatus?.isFollowing || false} />
+                           <FollowButton targetUserId={profile.id} initialIsFollowing={profile.followStatus?.isFollowing || false} followsYou={profile.followStatus?.followsYou || false} />
             </div>
           )}
         </div>
@@ -289,32 +313,73 @@ export function ProfileContent({ profile, onClose, fullPage = false }: { profile
           </p>
         )}
 
-        {profile.education && (
+               {profile.education && (
           <p className="p-rise" style={{ animationDelay: "0.24s", fontSize: 12.5, color: "rgba(20,19,43,0.5)", marginBottom: 14, textAlign: "center" }}>
             🎓 {profile.education}
           </p>
         )}
 
-        {profile.skills?.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", marginBottom: 20 }}>
-            {profile.skills.map((s: string, i: number) => (
-              <span
-                key={i}
-                className="p-chip"
+        {(profile.githubUrl || profile.linkedinUrl) && (
+          <div className="p-rise" style={{ animationDelay: "0.25s", display: "flex", justifyContent: "center", gap: 10, marginBottom: 16 }}>
+            {profile.githubUrl && (
+              
+              <a href={profile.githubUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="GitHub"
                 style={{
-                  animationDelay: `${0.25 + i * 0.04}s`,
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  background: "rgba(20,19,43,0.05)",
-                  color: "rgba(20,19,43,0.6)",
-                  padding: "4px 11px",
-                  borderRadius: 20,
-                  cursor: "default",
+                  width: 36, height: 36, borderRadius: 10, background: "#14132B", display: "flex",
+                  alignItems: "center", justifyContent: "center", color: "#fff", textDecoration: "none",
                 }}
               >
-                {s}
-              </span>
-            ))}
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.83 1.18 3.08 0 4.41-2.7 5.38-5.27 5.67.42.36.78 1.07.78 2.16 0 1.56-.01 2.82-.01 3.2 0 .3.2.66.79.55A10.52 10.52 0 0 0 23.5 12c0-6.35-5.15-11.5-11.5-11.5Z"/>
+                </svg>
+              </a>
+            )}
+            {profile.linkedinUrl && (
+              
+               <a href={profile.linkedinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="LinkedIn"
+                style={{
+                  width: 36, height: 36, borderRadius: 10, background: "#0A66C2", display: "flex",
+                  alignItems: "center", justifyContent: "center", color: "#fff", textDecoration: "none",
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.03-1.85-3.03-1.85 0-2.14 1.45-2.14 2.94v5.66H9.36V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45z"/>
+                </svg>
+              </a>
+            )}
+          </div>
+        )}
+
+
+        {profile.skills?.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", marginBottom: 20 }}>
+            {profile.skills.map((s: string, i: number) => {
+              const c = SKILL_COLORS[i % SKILL_COLORS.length];
+              return (
+                <span
+                  key={i}
+                  className="p-chip"
+                  style={{
+                    animationDelay: `${0.25 + i * 0.04}s`,
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    background: c.bg,
+                    color: c.text,
+                    padding: "4px 11px",
+                    borderRadius: 20,
+                    cursor: "default",
+                  }}
+                >
+                  {s}
+                </span>
+              );
+            })}
           </div>
         )}
 

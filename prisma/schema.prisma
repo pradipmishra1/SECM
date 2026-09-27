@@ -52,6 +52,8 @@ model StudentProfile {
   bio          String?
   bannerText   String?
   portfolioUrl String?
+  githubUrl    String?
+  linkedinUrl  String?
   user         User     @relation(fields: [userId], references: [id])
 }
 
@@ -61,6 +63,8 @@ model OrganizerProfile {
   orgName       String
   description   String?
   isVerified    Boolean        @default(false)
+  githubUrl     String?
+  linkedinUrl   String?
   announcements Announcement[]
   challenges    Challenge[]
   user          User           @relation(fields: [userId], references: [id])

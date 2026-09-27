@@ -113,6 +113,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
     prisma.follow.count({ where: { followerId: user.id } }),
   ]);
 
+  const isMutualFollow = !!followStatus.isFollowing && !!followStatus.followsYou;
+
   return NextResponse.json({
     id: user.id,
     name: user.name,
@@ -121,12 +123,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
     image: user.image,
     status: user.status,
     createdAt: user.createdAt,
-    education: user.studentProfile?.education || null,
+      education: user.studentProfile?.education || null,
     skills: user.studentProfile?.skills || [],
     interests: user.studentProfile?.interests || [],
     bio: user.studentProfile?.bio || user.organizerProfile?.description || null,
     orgName: user.organizerProfile?.orgName || null,
     isVerified: user.organizerProfile?.isVerified || false,
+    githubUrl: user.studentProfile?.githubUrl || user.organizerProfile?.githubUrl || null,
+    linkedinUrl: user.studentProfile?.linkedinUrl || user.organizerProfile?.linkedinUrl || null,
     stats,
     isOwner,
     history,
@@ -135,5 +139,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
     followerCount,
     followingCount,
     friendshipId,
+    isMutualFollow,
   });
 }

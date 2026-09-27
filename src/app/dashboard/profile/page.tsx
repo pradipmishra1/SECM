@@ -102,14 +102,14 @@ export default async function ProfilePage() {
 
   if (user.role === "ADMIN") {
     return (
-      <DashboardLayout role={user.role} userName={user.name} emailVerified={user.emailVerified} userEmail={user.email}>
-        <AdminProfile user={{ name: user.name, email: user.email, username: user.username, image: fullUser?.image || null }} />
-      </DashboardLayout>
-    );
+         <DashboardLayout role={user.role} userName={user.name} userImage={fullUser?.image || null} emailVerified={user.emailVerified} userEmail={user.email}>
+      <AdminProfile user={{ name: user.name, email: user.email, username: user.username, image: fullUser?.image || null }} />
+    </DashboardLayout>
+  );
   }
 
   return (
-    <DashboardLayout role={user.role} userName={user.name} emailVerified={user.emailVerified} userEmail={user.email}>
+    <DashboardLayout role={user.role} userName={user.name} userImage={fullUser?.image || null} emailVerified={user.emailVerified} userEmail={user.email}>
       <ProfileEditor
         user={{ name: user.name, email: user.email, username: user.username, image: fullUser?.image || null }}
         role={user.role}

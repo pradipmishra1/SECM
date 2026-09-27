@@ -120,9 +120,11 @@ export default function FriendButton({
 export function FollowButton({
   targetUserId,
   initialIsFollowing,
+  followsYou,
 }: {
   targetUserId: string;
   initialIsFollowing: boolean;
+  followsYou?: boolean;
 }) {
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
   const [failed, setFailed] = useState(false);
@@ -173,7 +175,7 @@ export function FollowButton({
         transition: "background 0.15s ease, color 0.15s ease",
       }}
     >
-      {failed ? "Failed, retry" : isFollowing ? "Following" : "+ Follow"}
+           {failed ? "Failed, retry" : isFollowing ? "Following" : followsYou ? "Follow Back" : "+ Follow"}
     </button>
   );
 }

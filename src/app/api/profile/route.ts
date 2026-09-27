@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
     if (body.name && body.name.trim() && body.name.trim() !== user.name) {
       await prisma.user.update({ where: { id: user.id }, data: { name: body.name.trim() } });
     }
+
+
    if (user.role === "STUDENT") {
   const dataFields = {
     education: body.education ?? undefined,
@@ -31,6 +33,8 @@ export async function POST(req: NextRequest) {
     skills: Array.isArray(body.skills) ? body.skills : [],
     interests: Array.isArray(body.interests) ? body.interests : [],
     portfolioUrl: body.portfolioUrl ?? undefined,
+    githubUrl: body.githubUrl ?? undefined,
+    linkedinUrl: body.linkedinUrl ?? undefined,
     bannerText: body.bannerText ?? undefined,
   };
   const updated = await prisma.studentProfile.upsert({
@@ -42,8 +46,8 @@ export async function POST(req: NextRequest) {
 } else if (user.role === "ORGANIZER") {
   await prisma.organizerProfile.upsert({
     where: { userId: user.id },
-    update: { orgName: body.orgName, description: body.bio },
-    create: { userId: user.id, orgName: body.orgName || user.name, description: body.bio, isVerified: false },
+    update: { orgName: body.orgName, description: body.bio, githubUrl: body.githubUrl ?? undefined, linkedinUrl: body.linkedinUrl ?? undefined },
+    create: { userId: user.id, orgName: body.orgName || user.name, description: body.bio, isVerified: false, githubUrl: body.githubUrl ?? undefined, linkedinUrl: body.linkedinUrl ?? undefined },
   });
 }
 

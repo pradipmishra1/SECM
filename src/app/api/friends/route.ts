@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
+import { getMutualFollowers } from "@/lib/mutualFollow";
 
 // Send a friend request
 export async function POST(req: NextRequest) {
@@ -44,29 +45,32 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ friendship });
 }
 
-// List incoming pending requests + current friends
+
+// List mutual followers ("friends") with a shared challenge if any
 export async function GET() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   const userId = (session.user as any).id;
 
-  const [incoming, friends] = await Promise.all([
-    prisma.friendship.findMany({
-      where: { addresseeId: userId, status: "PENDING" },
-      include: { requester: { select: { id: true, name: true, username: true, image: true } } },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.friendship.findMany({
-      where: { status: "ACCEPTED", OR: [{ requesterId: userId }, { addresseeId: userId }] },
-      include: {
-        requester: { select: { id: true, name: true, username: true, image: true } },
-        addressee: { select: { id: true, name: true, username: true, image: true } },
-      },
-      orderBy: { updatedAt: "desc" },
-    }),
-  ]);
+  const friendsList = await getMutualFollowers(userId);
 
-  const friendsList = friends.map((f) => (f.requesterId === userId ? f.addressee : f.requester));
+  const myChallengeIds = (
+    await prisma.participation.findMany({
+      where: { userId },
+      select: { challengeId: true },
+    })
+  ).map((p) => p.challengeId);
 
-  return NextResponse.json({ incoming, friends: friendsList });
+  const enriched = await Promise.all(
+    friendsList.map(async (f: any) => {
+      if (myChallengeIds.length === 0) return { ...f, mutualChallenge: null };
+      const shared = await prisma.participation.findFirst({
+        where: { userId: f.id, challengeId: { in: myChallengeIds } },
+        select: { challenge: { select: { title: true } } },
+      });
+      return { ...f, mutualChallenge: shared?.challenge.title || null };
+    })
+  );
+
+  return NextResponse.json({ incoming: [], friends: enriched });
 }
