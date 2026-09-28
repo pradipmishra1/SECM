@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import TiltCard from "./TiltCard";
 import { TypeBadge, StatusPill } from "./Badges";
 import { Icon } from "./icons";
@@ -23,46 +23,6 @@ function getTimeRemaining(deadline: string) {
   return { days, hours, minutes, total: diff };
 }
 
-const Shimmer = () => (
-  <div style={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 18 }}>
-    <div
-      style={{
-        position: "absolute",
-        top: "-50%",
-        left: "-50%",
-        width: "200%",
-        height: "200%",
-        background: "linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.06) 50%, transparent 70%)",
-        animation: "shimmerSweep 4s ease-in-out infinite",
-        transform: "rotate(25deg)",
-      }}
-    />
-    <style>{`
-      @keyframes shimmerSweep {
-        0% { transform: rotate(25deg) translateX(-60%) translateY(-60%); }
-        100% { transform: rotate(25deg) translateX(60%) translateY(60%); }
-      }
-    `}</style>
-  </div>
-);
-
-const GlowOrb = ({ color = "rgba(109,74,255,0.08)" }) => (
-  <div
-    style={{
-      position: "absolute",
-      top: "-30%",
-      right: "-20%",
-      width: 160,
-      height: 160,
-      borderRadius: "50%",
-      background: `radial-gradient(circle, ${color}, transparent 70%)`,
-      pointerEvents: "none",
-      zIndex: 0,
-      animation: "orbFloat 6s ease-in-out infinite",
-    }}
-  />
-);
-
 export default function ChallengeCard({
   challenge,
   onClick,
@@ -84,28 +44,9 @@ export default function ChallengeCard({
   const hasSubmitted = challenge.hasSubmitted;
   const missed = isPastDeadline && !hasSubmitted && challenge.hasOwnProperty("hasSubmitted");
   const [hover, setHover] = useState(false);
-  const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
-  const cardRef = useRef<HTMLDivElement>(null);
 
   const timeLeft = getTimeRemaining(challenge.deadline);
   const progress = Math.min((timeLeft.total / (7 * 24 * 60 * 60 * 1000)) * 100, 100);
-
-  useEffect(() => {
-    const handleMove = (e: MouseEvent) => {
-      if (!cardRef.current) return;
-      const rect = cardRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width;
-      const y = (e.clientY - rect.top) / rect.height;
-      setMousePos({ x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) });
-    };
-    const el = cardRef.current;
-    if (!el) return;
-    el.addEventListener("mousemove", handleMove);
-    return () => el.removeEventListener("mousemove", handleMove);
-  }, []);
-
-  const spotlightX = mousePos.x * 100;
-  const spotlightY = mousePos.y * 100;
 
   const statusColor = status === "Open" ? "#22C55E" : status === "Closing soon" ? "#F59E0B" : "#EF4444";
 
@@ -116,12 +57,12 @@ export default function ChallengeCard({
     ? "rgba(240,253,244,0.55)"
     : missed
     ? "rgba(254,242,242,0.55)"
-    : "rgba(255,255,255,0.85)";
+    : "#FFFFFF";
   const cardBorder = hasSubmitted
     ? "1px solid rgba(22,163,74,0.15)"
     : missed
     ? "1px solid rgba(185,28,28,0.15)"
-    : "1px solid rgba(255,255,255,0.5)";
+    : "1px solid rgba(109,74,255,0.1)";
 
   return (
     <div
@@ -129,17 +70,24 @@ export default function ChallengeCard({
       style={{ cursor: "pointer", height: "100%" }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      ref={cardRef}
       className="challenge-card-wrapper"
+      role="button"
+      tabIndex={0}
+      aria-label={`Open challenge: ${challenge.title}`}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick();
+        }
+      }}
     >
       <TiltCard
         intensity={3}
         glow="rgba(109,74,255,0.08)"
         style={{
           background: cardBg,
-          backdropFilter: "blur(16px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(16px) saturate(1.4)",
-          borderRadius: 22,
+          borderRadius: 18,
           border: cardBorder,
           padding: 24,
           position: "relative",
@@ -148,24 +96,13 @@ export default function ChallengeCard({
           display: "flex",
           flexDirection: "column",
           boxSizing: "border-box",
-          transition: "transform 0.35s cubic-bezier(.34,1.56,.64,1), box-shadow 0.4s ease",
           boxShadow: hover
-            ? "0 14px 32px rgba(109,74,255,0.10), 0 4px 12px rgba(109,74,255,0.05), inset 0 1px 0 rgba(255,255,255,0.5)"
-            : "0 2px 10px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.4)",
-          transform: hover ? "translateY(-3px)" : "translateY(0)",
+            ? "0 10px 26px rgba(45,35,100,0.1)"
+            : "0 2px 10px rgba(20,19,43,0.04)",
         }}
       >
         <style>{`
-          @keyframes orbFloat {
-            0%,100% { transform: translate(0,0) scale(1); }
-            33% { transform: translate(8px,-12px) scale(1.04); }
-            66% { transform: translate(-6px,10px) scale(0.96); }
-          }
-          @keyframes progressGlow {
-            0%,100% { opacity:0.4; }
-            50% { opacity:0.8; }
-          }
-          .challenge-card-wrapper { transition: all 0.3s cubic-bezier(.34,1.56,.64,1); }
+          .challenge-card-wrapper { transition: box-shadow 0.18s ease; }
           .badge-enter { animation: badgeSlide 0.4s cubic-bezier(.34,1.56,.64,1) both; }
           @keyframes badgeSlide {
             0% { opacity:0; transform: translateY(-8px) scale(0.92); }
@@ -184,6 +121,7 @@ export default function ChallengeCard({
             background-clip: text;
           }
           .deadline-text { transition: color 0.3s ease; }
+          .challenge-card-wrapper:focus-visible { outline: 3px solid rgba(109,74,255,0.35); outline-offset: 3px; }
           .review-link { transition: gap 0.15s ease, color 0.15s ease; display: inline-flex; align-items: center; gap: 3px; }
           .review-link:hover { gap: 6px; color: #4C2FCC !important; }
           .watermark {
@@ -202,24 +140,11 @@ export default function ChallengeCard({
             z-index: 0;
             user-select: none;
           }
+          @media (prefers-reduced-motion: reduce) {
+            .badge-enter { animation: none; }
+            .challenge-card-wrapper, .deadline-text, .review-link { transition: none; }
+          }
         `}</style>
-
-        <GlowOrb color="rgba(109,74,255,0.06)" />
-
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 0,
-            pointerEvents: "none",
-            background: `radial-gradient(circle at ${spotlightX}% ${spotlightY}%, rgba(255,255,255,0.15) 0%, transparent 55%)`,
-            transition: "background 0.1s ease-out",
-            borderRadius: 22,
-            opacity: hover ? 1 : 0,
-          }}
-        />
-
-       <Shimmer />
 
         {showWatermark && (
           <div className="watermark" style={{ "--wm-color": themeColor } as React.CSSProperties}>
@@ -252,6 +177,8 @@ export default function ChallengeCard({
                     filter: isBookmarked ? "none" : "grayscale(1)",
                   }}
                   title={isBookmarked ? "Remove bookmark" : "Bookmark this challenge"}
+                  aria-label={isBookmarked ? "Remove bookmark" : "Bookmark this challenge"}
+                  aria-pressed={isBookmarked}
                 >
                   🔖
                 </button>
@@ -342,7 +269,6 @@ export default function ChallengeCard({
                       background: `linear-gradient(90deg, ${statusColor}, ${statusColor}88)`,
                       transition: "width 0.6s cubic-bezier(.34,1.56,.64,1)",
                       boxShadow: `0 0 8px ${statusColor}33`,
-                      animation: "progressGlow 2s ease-in-out infinite",
                     }}
                   />
                 </div>

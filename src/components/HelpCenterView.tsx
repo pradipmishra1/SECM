@@ -73,7 +73,17 @@ export default function HelpCenterView() {
   };
 
   return (
-        <div style={{ width: "100%", fontFamily: "'Inter', sans-serif" }}>
+        <div className="help-page" style={{ width: "100%", fontFamily: "'Inter', sans-serif" }}>
+      <style>{`
+        .help-contact-grid { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(260px,1fr); gap: 20px; }
+        .help-card { min-width: 0; }
+        .help-page input:focus, .help-page textarea:focus { border-color: #6D4AFF !important; box-shadow: 0 0 0 3px rgba(109,74,255,0.1); }
+        .help-faq-button:focus-visible, .help-submit:focus-visible { outline: 3px solid rgba(109,74,255,0.4); outline-offset: 2px; }
+        .help-submit { transition: transform 0.15s ease, box-shadow 0.2s ease; }
+        .help-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(109,74,255,0.25); }
+        @media (max-width: 760px) { .help-contact-grid { grid-template-columns: minmax(0,1fr); } }
+        @media (prefers-reduced-motion: reduce) { .help-submit { transition: none !important; } }
+      `}</style>
       <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, color: "#14132B", marginBottom: 6 }}>
         Help Center
       </h1>
@@ -91,6 +101,9 @@ export default function HelpCenterView() {
             return (
               <div key={i} style={{ borderRadius: 12, border: "1px solid rgba(15,23,42,0.06)", overflow: "hidden" }}>
                 <button
+                  className="help-faq-button"
+                  aria-expanded={open}
+                  aria-controls={`help-faq-answer-${i}`}
                   onClick={() => setOpenIdx(open ? null : i)}
                   style={{
                     width: "100%",
@@ -108,10 +121,10 @@ export default function HelpCenterView() {
                   }}
                 >
                   {f.q}
-                  <span style={{ transform: open ? "rotate(45deg)" : "rotate(0deg)", transition: "transform 0.2s ease", fontSize: 20, color: "#6D4AFF" }}>+</span>
+                  <span aria-hidden="true" style={{ transform: open ? "rotate(45deg)" : "rotate(0deg)", transition: "transform 0.2s ease", fontSize: 20, color: "#6D4AFF" }}>+</span>
                 </button>
                 {open && (
-                  <div style={{ padding: "0 16px 14px", fontSize: 14.5, color: "rgba(20,19,43,0.6)", lineHeight: 1.65 }}>
+                  <div id={`help-faq-answer-${i}`} style={{ padding: "0 16px 14px", fontSize: 14.5, color: "rgba(20,19,43,0.6)", lineHeight: 1.65 }}>
                     {f.a}
                   </div>
                 )}
@@ -121,8 +134,8 @@ export default function HelpCenterView() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 20 }}>
-        <div style={cardBase}>
+      <div className="help-contact-grid">
+        <div className="help-card" style={cardBase}>
           <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 16, fontWeight: 700, color: "#14132B", marginBottom: 14 }}>
             Contact Support
           </h3>
@@ -131,7 +144,8 @@ export default function HelpCenterView() {
               <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(20,19,43,0.5)", marginBottom: 6, display: "block" }}>
                 Subject
               </label>
-              <input
+                <input
+                  required
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="What's this about?"
@@ -151,6 +165,7 @@ export default function HelpCenterView() {
                 Message
               </label>
               <textarea
+                required
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Describe your issue or question..."
@@ -177,6 +192,7 @@ export default function HelpCenterView() {
 
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <button
+                className="help-submit"
                 type="submit"
                 disabled={sending}
                 style={{
@@ -198,7 +214,7 @@ export default function HelpCenterView() {
           </form>
         </div>
 
-        <div style={{ ...cardBase, background: "linear-gradient(155deg,#EDE9FE,#F5F3FF)", border: "1px solid rgba(109,74,255,0.12)" }}>
+        <div className="help-card" style={{ ...cardBase, background: "linear-gradient(155deg,#EDE9FE,#F5F3FF)", border: "1px solid rgba(109,74,255,0.12)" }}>
           <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 16, fontWeight: 700, color: "#14132B", marginBottom: 10 }}>
             Need it faster?
           </h3>

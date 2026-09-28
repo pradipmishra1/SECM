@@ -89,6 +89,7 @@ export default async function MyChallengesPage() {
   challenges={JSON.parse(JSON.stringify(challenges))}
   role={user.role}
   joinedIds={joinedIds}
+  organizers={organizersWithChallenges}
   currentUserId={user.id}
 />
     </DashboardLayout>

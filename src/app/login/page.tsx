@@ -38,7 +38,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="auth-body">
+    <div className="auth-body login-page">
+      <style>{`
+        .login-page .auth-btn-submit { background: linear-gradient(135deg,#6D4AFF,#8B5CF6); }
+        .login-page .auth-field-group input:focus { border-color: rgba(109,74,255,0.5); box-shadow: 0 0 0 4px rgba(109,74,255,0.1); }
+        .login-page .auth-tab-btn:focus-visible, .login-page a:focus-visible, .login-page button:focus-visible { outline: 3px solid #8B5CF6; outline-offset: 3px; }
+        @media (prefers-reduced-motion: reduce) { .login-page .auth-card, .login-page button { animation: none !important; transition: none !important; } }
+      `}</style>
       <div className="auth-card">
         <div className="auth-brand">
           <LogoMark size={38} />
@@ -69,7 +75,7 @@ export default function LoginPage() {
           <div className="auth-field-group">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <label htmlFor="password">Password</label>
-              <Link href="/forgot-password" style={{ fontSize: 12.5, color: "#7c5cfc", fontWeight: 600, textDecoration: "none" }}>
+              <Link href="/forgot-password" style={{ fontSize: 12.5, color: "#6D4AFF", fontWeight: 600, textDecoration: "none" }}>
                 Forgot password?
               </Link>
             </div>

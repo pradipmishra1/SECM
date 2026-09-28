@@ -43,17 +43,11 @@ export default function PrivacyPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  function scrollTo(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", color: "#14132B", background: "#fff", minHeight: "100vh" }}>
       <style>{`
         @keyframes riseUp { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: translateY(0); } }
-        @keyframes drift { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-20px,14px); } }
         .r-up { animation: riseUp 0.6s cubic-bezier(.16,.8,.24,1) both; }
-        .drift-orb { animation: drift 10s ease-in-out infinite; }
         .toc-link { display: block; padding: 8px 14px; font-size: 13px; color: rgba(20,19,43,0.5); text-decoration: none; border-left: 2px solid transparent; transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease; cursor: pointer; border-radius: 0 8px 8px 0; }
         .toc-link:hover { color: #14132B; background: rgba(109,74,255,0.04); }
         .toc-link.active { color: #6D4AFF; font-weight: 700; border-left-color: #6D4AFF; background: rgba(109,74,255,0.06); }
@@ -68,7 +62,20 @@ export default function PrivacyPage() {
         .back-link:hover { color: #6D4AFF; gap: 9px; }
         .contact-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
         .contact-card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(109,74,255,0.15); }
-        @media (max-width: 900px) { .toc-sidebar { display: none; } }
+        .back-link:focus-visible, .toc-link:focus-visible { outline: 3px solid #8B5CF6; outline-offset: 3px; }
+        @media (max-width: 900px) {
+          .toc-sidebar { display: none; }
+          .policy-layout { grid-template-columns: minmax(0, 1fr) !important; gap: 0 !important; padding-left: 32px !important; padding-right: 32px !important; }
+        }
+        @media (max-width: 640px) {
+          .policy-nav { padding: 16px 20px !important; }
+          .policy-hero { padding: 56px 20px 40px !important; }
+          .policy-layout { padding: 28px 20px 64px !important; }
+          .policy-section h2 { font-size: 19px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .r-up, .contact-card { animation: none !important; transition: none !important; }
+        }
       `}</style>
 
       {/* Reading progress bar */}
@@ -77,7 +84,7 @@ export default function PrivacyPage() {
       </div>
 
       {/* Nav */}
-      <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 48px", position: "sticky", top: 3, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(14px)", zIndex: 50, borderBottom: "1px solid rgba(15,23,42,0.07)" }}>
+      <nav className="policy-nav" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 48px", position: "sticky", top: 3, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(14px)", zIndex: 50, borderBottom: "1px solid rgba(15,23,42,0.07)" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
          <LogoMark size={30} />
           <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16.5, color: "#14132B" }}>SECM</span>
@@ -89,8 +96,8 @@ export default function PrivacyPage() {
       </nav>
 
       {/* Hero */}
-      <div style={{ position: "relative", overflow: "hidden", padding: "70px 48px 50px", background: "linear-gradient(180deg,#FBFAFF,#F6F5FB)", borderBottom: "1px solid rgba(15,23,42,0.07)" }}>
-        <div className="drift-orb" style={{ position: "absolute", top: -60, right: 60, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle, rgba(109,74,255,0.08), transparent 70%)", pointerEvents: "none" }} />
+      <div className="policy-hero" style={{ position: "relative", overflow: "hidden", padding: "70px 48px 50px", background: "linear-gradient(180deg,#FBFAFF,#F6F5FB)", borderBottom: "1px solid rgba(15,23,42,0.07)" }}>
+        <div style={{ position: "absolute", top: -60, right: 60, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle, rgba(109,74,255,0.08), transparent 70%)", pointerEvents: "none" }} />
         <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative" }} className="r-up">
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, color: "#6D4AFF", background: "rgba(109,74,255,0.08)", padding: "6px 14px", borderRadius: 20, marginBottom: 18 }}>
             🔒 Legal · Privacy
@@ -106,12 +113,12 @@ export default function PrivacyPage() {
       </div>
 
       {/* Body: sidebar + content */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "220px 1fr", gap: 50, padding: "50px 48px 100px" }}>
+      <div className="policy-layout" style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "220px 1fr", gap: 50, padding: "50px 48px 100px" }}>
         {/* Sticky TOC */}
         <div className="toc-sidebar" style={{ position: "sticky", top: 90, alignSelf: "start" }}>
           <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(20,19,43,0.4)", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 10, paddingLeft: 14 }}>On this page</p>
           {SECTIONS.map((s) => (
-            <a key={s.id} onClick={() => scrollTo(s.id)} className={"toc-link" + (activeSection === s.id ? " active" : "")}>
+            <a key={s.id} href={`#${s.id}`} className={"toc-link" + (activeSection === s.id ? " active" : "")}>
               {s.title}
             </a>
           ))}

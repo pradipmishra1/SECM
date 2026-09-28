@@ -22,9 +22,7 @@ export default function AboutPage() {
     <div style={{ fontFamily: "'Inter', sans-serif", color: "#14132B", background: "#fff", minHeight: "100vh", overflowX: "hidden" }}>
       <style>{`
         @keyframes riseUp { from { opacity:0; transform: translateY(18px); } to { opacity:1; transform: translateY(0); } }
-        @keyframes drift { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-20px,16px); } }
         .r-up { animation: riseUp 0.6s cubic-bezier(.16,.8,.24,1) both; }
-        .drift-orb { animation: drift 10s ease-in-out infinite; }
         .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; color: rgba(20,19,43,0.55); text-decoration: none; transition: color 0.2s ease, gap 0.2s ease; }
         .back-link:hover { color: #6D4AFF; gap: 9px; }
         .value-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
@@ -37,9 +35,23 @@ export default function AboutPage() {
         .dev-card:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(20,19,43,0.1); }
         .cta-btn { transition: transform 0.15s ease, box-shadow 0.2s ease; }
         .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(109,74,255,0.35); }
+        .back-link:focus-visible, .cta-btn:focus-visible { outline: 3px solid #8B5CF6; outline-offset: 4px; }
+        @media (max-width: 640px) {
+          .about-nav { padding: 16px 20px !important; }
+          .about-hero { padding: 64px 20px 56px !important; }
+          .about-section { padding-left: 20px !important; padding-right: 20px !important; }
+          .about-story { padding-top: 64px !important; padding-bottom: 64px !important; }
+          .about-values { padding-bottom: 64px !important; }
+          .about-timeline, .about-team { padding-bottom: 72px !important; }
+          .about-cta { padding-bottom: 64px !important; }
+          .about-cta-card { padding: 36px 24px !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .r-up, .value-card, .dev-card, .cta-btn { animation: none !important; transition: none !important; }
+        }
       `}</style>
 
-      <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 48px", position: "sticky", top: 0, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(14px)", zIndex: 50, borderBottom: "1px solid rgba(15,23,42,0.07)" }}>
+      <nav className="about-nav" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 48px", position: "sticky", top: 0, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(14px)", zIndex: 50, borderBottom: "1px solid rgba(15,23,42,0.07)" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
            <LogoMark size={30} />
           <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16.5, color: "#14132B" }}>SECM</span>
@@ -51,8 +63,7 @@ export default function AboutPage() {
       </nav>
 
       {/* Hero */}
-      <div style={{ position: "relative", overflow: "hidden", padding: "90px 48px 70px", background: "linear-gradient(180deg,#FBFAFF,#F6F5FB)", textAlign: "center" }}>
-        <div className="drift-orb" style={{ position: "absolute", top: -60, left: "20%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(109,74,255,0.09), transparent 70%)", pointerEvents: "none" }} />
+      <div className="about-hero" style={{ position: "relative", overflow: "hidden", padding: "90px 48px 70px", background: "linear-gradient(180deg,#FBFAFF,#F6F5FB)", textAlign: "center" }}>
         <div style={{ maxWidth: 720, margin: "0 auto", position: "relative" }} className="r-up">
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, color: "#6D4AFF", background: "rgba(109,74,255,0.08)", padding: "6px 14px", borderRadius: 20, marginBottom: 20 }}>
             ABOUT
@@ -67,7 +78,7 @@ export default function AboutPage() {
       </div>
 
       {/* Story */}
-      <section style={{ padding: "90px 48px", maxWidth: 720, margin: "0 auto" }}>
+      <section className="about-section about-story" style={{ padding: "90px 48px", maxWidth: 720, margin: "0 auto" }}>
         <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, marginBottom: 20, letterSpacing: -0.5 }}>Why we built this</h2>
         <p style={{ fontSize: 14.5, color: "rgba(20,19,43,0.6)", lineHeight: 1.8, marginBottom: 16 }}>
           Most student hackathons still run on scattered spreadsheets, WhatsApp groups, and manual scoring. Organizers lose track of submissions, students don't know where they stand, and winners get announced through a message that's easy to miss.
@@ -78,7 +89,7 @@ export default function AboutPage() {
       </section>
 
       {/* Values */}
-      <section style={{ padding: "0 48px 90px", maxWidth: 1000, margin: "0 auto" }}>
+      <section className="about-section about-values" style={{ padding: "0 48px 90px", maxWidth: 1000, margin: "0 auto" }}>
         <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, marginBottom: 30, letterSpacing: -0.5, textAlign: "center" }}>What we care about</h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 }}>
           {VALUES.map((v) => (
@@ -91,7 +102,7 @@ export default function AboutPage() {
       </section>
 
       {/* Timeline */}
-      <section style={{ padding: "0 48px 100px", maxWidth: 640, margin: "0 auto" }}>
+      <section className="about-section about-timeline" style={{ padding: "0 48px 100px", maxWidth: 640, margin: "0 auto" }}>
         <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, marginBottom: 36, letterSpacing: -0.5 }}>How it came together</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 34 }}>
           {TIMELINE.map((t) => (
@@ -104,7 +115,7 @@ export default function AboutPage() {
       </section>
 
       {/* Developers */}
-      <section style={{ padding: "0 48px 100px", maxWidth: 720, margin: "0 auto" }}>
+      <section className="about-section about-team" style={{ padding: "0 48px 100px", maxWidth: 720, margin: "0 auto" }}>
         <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, marginBottom: 30, letterSpacing: -0.5, textAlign: "center" }}>Built by</h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
           {["Pradip Mishra", "Anish Subedi"].map((name) => (
@@ -120,11 +131,11 @@ export default function AboutPage() {
       </section>
 
       {/* CTA */}
-      <section style={{ padding: "0 48px 100px", textAlign: "center" }}>
-        <div style={{ maxWidth: 640, margin: "0 auto", background: "#14132B", borderRadius: 24, padding: "50px 40px" }}>
+      <section className="about-section about-cta" style={{ padding: "0 48px 100px", textAlign: "center" }}>
+        <div className="about-cta-card" style={{ maxWidth: 640, margin: "0 auto", background: "#14132B", borderRadius: 24, padding: "50px 40px" }}>
           <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 24, fontWeight: 700, color: "#fff", marginBottom: 12 }}>Ready to see it in action?</h2>
           <p style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", marginBottom: 26 }}>Create a free account and explore the platform.</p>
-          <Link href="/signup" className="cta-btn" style={{ display: "inline-block", background: "#fff", color: "#14132B", textDecoration: "none", padding: "13px 30px", borderRadius: 12, fontSize: 14.5, fontWeight: 700 }}>
+          <Link href="/register" className="cta-btn" style={{ display: "inline-block", background: "#fff", color: "#14132B", textDecoration: "none", padding: "13px 30px", borderRadius: 12, fontSize: 14.5, fontWeight: 700 }}>
             Get started
           </Link>
         </div>

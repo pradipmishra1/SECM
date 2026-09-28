@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Icon } from "./icons";
 import { useEffect, useRef } from "react";
-import NotificationBell from "./NotificationBell";
 import NotificationsPanel from "./NotificationsPanel";
 import { LogoMark } from "./Logo";
 
@@ -172,7 +171,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#F5F5F8", fontFamily: "'Inter', sans-serif" }}>
+    <div className="dashboard-shell" style={{ display: "flex", minHeight: "100vh", background: "#F5F5F8", fontFamily: "'Inter', sans-serif" }}>
       <style>{`
         .sidebar-scroll::-webkit-scrollbar { width: 0px; background: transparent; }
         .sidebar-scroll { scrollbar-width: none; -ms-overflow-style: none; }
@@ -233,10 +232,56 @@ export default function DashboardLayout({
           color: #DC2626 !important;
         }
         .logout-box:hover .icon-wrap { color: #DC2626 !important; }
+
+        @media (max-width: 900px) {
+          .dashboard-shell { flex-direction: column; }
+          .dashboard-sidebar {
+            width: 100% !important;
+            height: auto !important;
+            min-height: 0;
+            position: sticky !important;
+            z-index: 30;
+            top: 0;
+            padding: 12px 16px 8px !important;
+            border-right: 0 !important;
+            border-bottom: 1px solid rgba(15,23,42,0.08);
+            overflow: visible !important;
+          }
+          .dashboard-brand-divider, .dashboard-sidebar-logout { display: none !important; }
+          .dashboard-nav-groups {
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 10px !important;
+            margin-top: 10px;
+            overflow-x: auto;
+            overscroll-behavior-x: contain;
+            scrollbar-width: none;
+            padding: 0 0 3px;
+          }
+          .dashboard-nav-groups::-webkit-scrollbar { display: none; }
+          .dashboard-nav-group { flex: 0 0 auto; }
+          .dashboard-nav-group > span { display: none !important; }
+          .dashboard-nav-items { flex-direction: row !important; gap: 6px !important; }
+          .dashboard-nav-items .nav-box { padding: 9px 11px; font-size: 13px; gap: 8px; border-radius: 11px; }
+          .dashboard-header { padding: 12px 18px !important; gap: 12px; }
+          .dashboard-header-search { width: min(360px, 46vw) !important; }
+          .dashboard-header-tools { gap: 10px !important; }
+          .dashboard-user-name { display: none; }
+          .dashboard-main-content { padding: 24px 20px !important; }
+        }
+
+        @media (max-width: 520px) {
+          .dashboard-sidebar { padding: 10px 12px 7px !important; }
+          .dashboard-header { padding: 10px 12px !important; }
+          .dashboard-header-search { width: auto !important; flex: 1; min-width: 0; }
+          .dashboard-header-tools { gap: 6px !important; }
+          .dashboard-header-tools > a, .dashboard-header-tools > button { flex: 0 0 auto; }
+          .dashboard-main-content { padding: 18px 12px !important; }
+        }
       `}</style>
 
       <aside
-        className="sidebar-scroll"
+        className="sidebar-scroll dashboard-sidebar"
         style={{
           width: 280,
           background: "#FAFAFC",
@@ -266,12 +311,12 @@ export default function DashboardLayout({
           </span>
         </div>
 
-        <div style={{ height: 1, background: "rgba(15,23,42,0.06)", margin: "18px 4px 22px" }} />
+        <div className="dashboard-brand-divider" style={{ height: 1, background: "rgba(15,23,42,0.06)", margin: "18px 4px 22px" }} />
 
         {/* Nav groups */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 24, flex: 1 }}>
+        <div className="dashboard-nav-groups" style={{ display: "flex", flexDirection: "column", gap: 24, flex: 1 }}>
           {groups.map((group) => (
-            <div key={group.label}>
+            <div key={group.label} className="dashboard-nav-group">
               <span
                 style={{
                   fontSize: 11,
@@ -286,7 +331,7 @@ export default function DashboardLayout({
               >
                 {group.label}
               </span>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div className="dashboard-nav-items" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {group.items.map((item, i) => {
                   const active = pathname === item.href;
                   const IconComp = Icon[item.icon];
@@ -310,7 +355,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Logout */}
-        <div style={{ marginTop: 20 }}>
+        <div className="dashboard-sidebar-logout" style={{ marginTop: 20 }}>
           <div style={{ height: 1, background: "rgba(15,23,42,0.06)", margin: "0 4px 12px" }} />
           <button
             className="nav-box logout-box"
@@ -331,8 +376,9 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div className="dashboard-main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <header
+          className="dashboard-header"
           style={{
             display: "flex",
             alignItems: "center",
@@ -342,7 +388,7 @@ export default function DashboardLayout({
             background: "#FFFFFF",
           }}
         >
-          <div ref={searchBoxRef} style={{ position: "relative", width: 360 }}>
+          <div ref={searchBoxRef} className="dashboard-header-search" style={{ position: "relative", width: 360 }}>
             <Icon.search
               width={15}
               height={15}
@@ -429,7 +475,7 @@ export default function DashboardLayout({
               </div>
             )}
           </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+                    <div className="dashboard-header-tools" style={{ display: "flex", alignItems: "center", gap: 18 }}>
             <div
               onClick={() => router.push("/dashboard/help")}
               title="Help Center"
@@ -476,12 +522,12 @@ export default function DashboardLayout({
                   {userName?.[0]?.toUpperCase() || "U"}
                 </div>
               )}
-              <span style={{ fontSize: 13.5, fontWeight: 600, color: "#14132B" }}>{userName}</span>
+              <span className="dashboard-user-name" style={{ fontSize: 13.5, fontWeight: 600, color: "#14132B" }}>{userName}</span>
             </div>
           </div>
         </header>
 
-        <main style={{ flex: 1, padding: 36 }}>
+        <main className="dashboard-main-content" style={{ flex: 1, padding: 36 }}>
           {emailVerified === false && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 12, padding: "12px 18px", marginBottom: 20, flexWrap: "wrap" }}>
               <span style={{ fontSize: 13, color: "#92400E", fontWeight: 600 }}>

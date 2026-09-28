@@ -17,23 +17,41 @@ export default function TeamDetailModal({ teamId, currentUserId, onClose }: { te
   }, [teamId]);
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
+
+  useEffect(() => {
     if (searchQuery.length < 2) {
       setSearchResults([]);
       return;
     }
     const timer = setTimeout(() => {
       fetch(`/api/users/search?q=${encodeURIComponent(searchQuery)}`)
-        .then((r) => r.json())
-        .then((d) => setSearchResults(d.users || []));
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Search unavailable"))))
+        .then((d) => setSearchResults(d.users || []))
+        .catch(() => setSearchResults([]));
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
   function loadTeam() {
     fetch(`/api/teams/${teamId}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Team unavailable"))))
       .then((d) => {
         setTeam(d.team);
+        setLoading(false);
+      })
+      .catch(() => {
+        setTeam(null);
         setLoading(false);
       });
   }
@@ -42,26 +60,32 @@ export default function TeamDetailModal({ teamId, currentUserId, onClose }: { te
     setInviting(true);
     setError("");
     setSuccess("");
-    const res = await fetch(`/api/teams/${teamId}/invite`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username }),
-    });
-    const data = await res.json();
-    setInviting(false);
-    if (!res.ok) {
-      setError(data.error || "Failed to send invite");
-      return;
+    try {
+      const res = await fetch(`/api/teams/${teamId}/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to send invite");
+        return;
+      }
+      setSuccess(`Invite sent to @${username}`);
+      setSearchQuery("");
+      loadTeam();
+    } catch {
+      setError("Could not send the invite. Please try again.");
+    } finally {
+      setInviting(false);
     }
-    setSuccess(`Invite sent to @${username}`);
-    setSearchQuery("");
-    loadTeam();
   }
 
   const isLeader = team?.leaderId === currentUserId;
 
   return (
     <div
+      role="presentation"
       onClick={onClose}
       style={{
         position: "fixed",
@@ -124,9 +148,29 @@ export default function TeamDetailModal({ teamId, currentUserId, onClose }: { te
           background-size: 200px 3px;
           animation: tdWaveMove 3s linear infinite;
         }
+        .td-orb-1, .td-orb-2, .td-pending-dot, .td-bubble, .td-wave { animation: none; }
+        .td-modal { width: 860px; max-width: 95vw; height: 82vh; max-height: 700px; }
+        .td-body { flex: 1; display: flex; min-height: 0; }
+        @media (max-width: 700px) {
+          .td-modal { width: calc(100vw - 24px) !important; max-width: none !important; height: 94dvh !important; max-height: none !important; border-radius: 18px !important; }
+          .td-body { flex-direction: column; }
+          .td-left-panel { width: 100% !important; height: 42%; flex: none; border-right: 0 !important; border-bottom: 1px solid rgba(15,23,42,0.06); padding: 14px !important; }
+          .td-chat-panel { flex: 1; min-height: 0; }
+          .td-chat-panel > div:last-child { padding: 0 12px 12px !important; }
+          .td-chat-deco { display: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .td-orb-1, .td-orb-2, .td-pending-dot, .td-bubble, .td-wave { animation: none !important; }
+          .td-member-row { animation: none !important; }
+          .td-member-row, .td-member-avatar, .td-invite-row, .td-invite-btn, .td-close-btn { transition: none !important; }
+        }
       `}</style>
 
       <div
+        className="td-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={team?.name ? `${team.name} team details` : "Team details"}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: "#fff",
@@ -207,7 +251,7 @@ export default function TeamDetailModal({ teamId, currentUserId, onClose }: { te
             </div>
 
             {/* Two-column body */}
-            <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+            <div className="td-body">
               {/* Left panel: members, invites, search */}
               <div className="td-left-panel" style={{ width: "42%", borderRight: "1px solid rgba(15,23,42,0.06)", overflowY: "auto", padding: "20px 22px" }}>
                 {isLeader && (
@@ -351,7 +395,7 @@ export default function TeamDetailModal({ teamId, currentUserId, onClose }: { te
                 )}
               </div>
 
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: "#FBFAFF" }}>
+              <div className="td-chat-panel" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: "#FBFAFF" }}>
                 <div style={{ padding: "16px 20px 6px", flexShrink: 0, position: "relative", overflow: "hidden" }}>
                   <SectionLabel>💬 Team Chat</SectionLabel>
                   <div className="td-chat-deco" style={{ position: "relative", height: 46, marginTop: 4 }}>

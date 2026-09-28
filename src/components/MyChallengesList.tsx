@@ -58,23 +58,36 @@ const [active, setActive] = useState<any>(null);
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch("/api/bookmarks")
-      .then((r) => r.json())
-      .then((d) => setBookmarkedIds(d.challengeIds || []));
+    const controller = new AbortController();
+    fetch("/api/bookmarks", { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error("Unable to load bookmarks.");
+        return r.json();
+      })
+      .then((d) => setBookmarkedIds(d.challengeIds || []))
+      .catch((error) => {
+        if (!(error instanceof Error && error.name === "AbortError")) setBookmarkedIds([]);
+      });
+    return () => controller.abort();
   }, []);
 
   async function toggleBookmark(challengeId: string) {
+    const wasBookmarked = bookmarkedIds.includes(challengeId);
     setBookmarkedIds((prev) =>
-      prev.includes(challengeId) ? prev.filter((id) => id !== challengeId) : [...prev, challengeId]
+      wasBookmarked ? prev.filter((id) => id !== challengeId) : [...prev, challengeId]
     );
-    const res = await fetch("/api/bookmarks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ challengeId }),
-    });
-    if (!res.ok) {
+    try {
+      const res = await fetch("/api/bookmarks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeId }),
+      });
+      if (!res.ok) throw new Error("Unable to update bookmark.");
+    } catch {
       setBookmarkedIds((prev) =>
-        prev.includes(challengeId) ? prev.filter((id) => id !== challengeId) : [...prev, challengeId]
+        wasBookmarked
+          ? prev.includes(challengeId) ? prev : [...prev, challengeId]
+          : prev.filter((id) => id !== challengeId)
       );
     }
   }
@@ -138,18 +151,29 @@ const filteredChallenges = useMemo(() => {
     <>
       <style>{`
         @keyframes mcGridIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
-        @keyframes mcFilterPop { 0% { transform: scale(0.9); } 60% { transform: scale(1.05); } 100% { transform: scale(1); } }
         .mc-search:focus { border-color: rgba(109,74,255,0.4) !important; box-shadow: 0 0 0 3px rgba(109,74,255,0.08); }
         .mc-sort:focus { border-color: rgba(109,74,255,0.4) !important; }
-        .mc-pill { transition: all 0.2s ease; }
-        .mc-pill:active { animation: mcFilterPop 0.25s ease; }
+        .mc-pill { transition: background-color 0.18s ease, color 0.18s ease; }
         .mc-pill:hover:not(.mc-pill-active) { background: rgba(109,74,255,0.08) !important; color: #6D4AFF !important; }
         .mc-grid-item { animation: mcGridIn 0.35s cubic-bezier(.2,.8,.2,1) both; }
         .mc-count-badge { font-size: 10.5px; font-weight: 700; opacity: 0.7; margin-left: 4px; }
+        .mc-toolbar { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; }
+        .mc-filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+        .mc-organizer-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+        .mc-challenge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 18px; }
+        .mc-pill:focus-visible, .mc-search:focus-visible, .mc-sort:focus-visible { outline: 3px solid rgba(109,74,255,0.35); outline-offset: 2px; }
+        @media (max-width: 600px) {
+          .mc-toolbar { align-items: stretch; flex-direction: column; }
+          .mc-search-wrap { flex-basis: auto !important; min-width: 0 !important; }
+          .mc-sort { width: 100%; }
+          .mc-filter-row, .mc-organizer-row { gap: 6px; }
+          .mc-filter-row > button, .mc-organizer-row > button { padding: 8px 12px !important; font-size: 12.5px !important; }
+        }
+        @media (prefers-reduced-motion: reduce) { .mc-grid-item { animation: none; } .mc-pill { transition: none; } }
       `}</style>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
-        <div style={{ position: "relative", flex: "1 1 220px", minWidth: 200 }}>
+      <div className="mc-toolbar">
+        <div className="mc-search-wrap" style={{ position: "relative", flex: "1 1 220px", minWidth: 200 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(20,19,43,0.35)" strokeWidth="2" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}>
             <circle cx="11" cy="11" r="6.5" />
             <path d="m20 20-4-4" strokeLinecap="round" />
@@ -197,12 +221,13 @@ const filteredChallenges = useMemo(() => {
       </div>
 
       {isOrganizer && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+        <div className="mc-filter-row" role="group" aria-label="Challenge status">
           {STATUS_FILTERS.map((s) => (
             <button
               key={s}
               className={"mc-pill" + (statusFilter === s ? " mc-pill-active" : "")}
               onClick={() => setStatusFilter(s)}
+              aria-pressed={statusFilter === s}
               style={{
                 padding: "8px 16px",
                 borderRadius: 20,
@@ -222,12 +247,13 @@ const filteredChallenges = useMemo(() => {
       )}
 
      {!isOrganizer && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
+        <div className="mc-filter-row" role="group" aria-label="Challenge filters">
           {STUDENT_STATUS_FILTERS.map((s) => (
             <button
               key={s}
               className={"mc-pill" + (studentStatusFilter === s ? " mc-pill-active" : "")}
               onClick={() => setStudentStatusFilter(s)}
+              aria-pressed={studentStatusFilter === s}
               style={{
                 padding: "8px 16px",
                 borderRadius: 20,
@@ -259,8 +285,8 @@ const filteredChallenges = useMemo(() => {
               gap: 6,
               background: joinedOnly ? "linear-gradient(135deg,#16A34A,#15803D)" : "transparent",
               color: joinedOnly ? "#fff" : "#6D4AFF",
-              marginLeft: "auto",
             }}
+            aria-pressed={joinedOnly}
           >
             {joinedOnly ? "✓" : ""} My Joined Only
           </button>
@@ -269,16 +295,17 @@ const filteredChallenges = useMemo(() => {
             style={{
               padding: "8px 16px",
               borderRadius: 20,
-              border: bookmarkedOnly ? "none" : "1px solid rgba(217,119,6,0.25)",
+              border: bookmarkedOnly ? "none" : "1px solid rgba(109,74,255,0.25)",
               fontSize: 13,
               fontWeight: 600,
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               gap: 6,
-              background: bookmarkedOnly ? "linear-gradient(135deg,#D97706,#B45309)" : "transparent",
-              color: bookmarkedOnly ? "#fff" : "#B45309",
+              background: bookmarkedOnly ? "linear-gradient(135deg,#6D4AFF,#8B5CF6)" : "transparent",
+              color: bookmarkedOnly ? "#fff" : "#6D4AFF",
             }}
+            aria-pressed={bookmarkedOnly}
           >
             {bookmarkedOnly ? "🔖" : "🔖"} Bookmarked
           </button>
@@ -286,10 +313,11 @@ const filteredChallenges = useMemo(() => {
       )}
 
       {!isOrganizer && organizers.length > 0 && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+        <div className="mc-organizer-row" role="group" aria-label="Filter by organizer">
           <button
             className={"mc-pill" + (filterOrgId === "ALL" ? " mc-pill-active" : "")}
             onClick={() => setFilterOrgId("ALL")}
+            aria-pressed={filterOrgId === "ALL"}
             style={{
               padding: "8px 16px",
               borderRadius: 20,
@@ -308,6 +336,7 @@ const filteredChallenges = useMemo(() => {
               key={o.id}
               className={"mc-pill" + (filterOrgId === o.id ? " mc-pill-active" : "")}
               onClick={() => setFilterOrgId(o.id)}
+              aria-pressed={filterOrgId === o.id}
               style={{
                 padding: "8px 16px",
                 borderRadius: 20,
@@ -341,7 +370,7 @@ const filteredChallenges = useMemo(() => {
           <p style={{ color: "rgba(20,19,43,0.4)", fontSize: 14 }}>No challenges match this filter.</p>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 18 }}>
+        <div className="mc-challenge-grid">
           {filteredChallenges.map((c, i) => (
             <div key={c.id} className="mc-grid-item" style={{ animationDelay: `${Math.min(i * 0.04, 0.3)}s` }}>
              <ChallengeCard

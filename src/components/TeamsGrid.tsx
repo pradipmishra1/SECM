@@ -8,14 +8,9 @@ import { useState } from "react";
 import TeamDetailModal from "./TeamDetailModal";
 
 const TEAM_THEMES = [
-  { bg: "linear-gradient(135deg, #FFF0F0 0%, #FFDCE0 100%)", blob: "rgba(239,68,68,0.15)", accent: "#DC2626", chip: "#DC2626" },
-  { bg: "linear-gradient(135deg, #F0EDFF 0%, #E6E0FF 100%)", blob: "rgba(109,74,255,0.18)", accent: "#6D4AFF", chip: "#6D4AFF" },
-  { bg: "linear-gradient(135deg, #E8F9F1 0%, #D3F3E3 100%)", blob: "rgba(22,163,74,0.16)", accent: "#15803D", chip: "#15803D" },
-  { bg: "linear-gradient(135deg, #FFF7E8 0%, #FFEFD1 100%)", blob: "rgba(245,158,11,0.18)", accent: "#D97706", chip: "#D97706" },
-  { bg: "linear-gradient(135deg, #E9F3FF 0%, #D6E9FF 100%)", blob: "rgba(37,99,235,0.16)", accent: "#2563EB", chip: "#2563EB" },
-  { bg: "linear-gradient(135deg, #FDF0FF 0%, #F7DFFF 100%)", blob: "rgba(192,38,211,0.16)", accent: "#A21CAF", chip: "#A21CAF" },
-  { bg: "linear-gradient(135deg, #FFF0F5 0%, #FFDCEB 100%)", blob: "rgba(236,72,153,0.16)", accent: "#DB2777", chip: "#DB2777" },
-  { bg: "linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)", blob: "rgba(5,150,105,0.16)", accent: "#047857", chip: "#047857" },
+  { bg: "linear-gradient(145deg, #FFFFFF 0%, #F3F0FF 100%)", blob: "rgba(109,74,255,0.13)", accent: "#6D4AFF", chip: "#6D4AFF" },
+  { bg: "linear-gradient(145deg, #FFFFFF 0%, #F5F3FF 100%)", blob: "rgba(139,92,246,0.13)", accent: "#8B5CF6", chip: "#8B5CF6" },
+  { bg: "linear-gradient(145deg, #FFFFFF 0%, #F0EDFF 100%)", blob: "rgba(124,58,237,0.13)", accent: "#7C3AED", chip: "#7C3AED" },
 ];
 
 function getTeamTheme(teamId: string) {
@@ -28,14 +23,14 @@ function getTeamTheme(teamId: string) {
 
 export default function TeamsGrid({ teams, userId, invites }: { teams: any[]; userId: string; invites: any[] }) {
   const router = useRouter();
-const [openTeamId, setOpenTeamId] = useState<string | null>(null);
+  const [openTeamId, setOpenTeamId] = useState<string | null>(null);
   async function respondInvite(inviteId: string, accept: boolean) {
-    await fetch(`/api/team-invites/${inviteId}`, {
+    const response = await fetch(`/api/team-invites/${inviteId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ accept }),
     });
-    router.refresh();
+    if (response.ok) router.refresh();
   }
 
   return (
@@ -51,6 +46,16 @@ const [openTeamId, setOpenTeamId] = useState<string | null>(null);
         .invite-anim { animation: teamRiseIn 0.35s cubic-bezier(.2,.8,.2,1) both; }
         .accept-btn, .reject-btn { transition: transform 0.15s ease; }
         .accept-btn:hover, .reject-btn:hover { transform: translateY(-1px); }
+        .team-card:focus-visible, .team-create:focus-visible { outline: 3px solid rgba(109,74,255,0.4); outline-offset: 3px; }
+        @media (max-width: 520px) {
+          .team-invite { align-items: flex-start !important; flex-direction: column !important; gap: 12px; }
+          .team-invite-actions { align-self: flex-end; }
+          .team-grid { grid-template-columns: minmax(0, 1fr) !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .team-anim, .invite-anim { animation: none !important; }
+          .team-anim, .create-tile, .create-plus, .accept-btn, .reject-btn { transition: none !important; }
+        }
       `}</style>
 
       {invites.length > 0 && (
@@ -62,7 +67,7 @@ const [openTeamId, setOpenTeamId] = useState<string | null>(null);
             {invites.map((inv, i) => (
               <div
                 key={inv.id}
-                className="invite-anim"
+                className="invite-anim team-invite"
                 style={{
                   animationDelay: `${i * 0.05}s`,
                   background: "#fff",
@@ -98,7 +103,7 @@ const [openTeamId, setOpenTeamId] = useState<string | null>(null);
                     <p style={{ fontSize: 12, color: "rgba(20,19,43,0.45)" }}>{inv.team.challenge.title}</p>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="team-invite-actions" style={{ display: "flex", gap: 8 }}>
                   <button
                     className="reject-btn"
                     onClick={() => respondInvite(inv.id, false)}
@@ -120,16 +125,25 @@ const [openTeamId, setOpenTeamId] = useState<string | null>(null);
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 18 }}>
+      <div className="team-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: 18 }}>
         {teams.map((t, i) => {
           const isLeader = t.leaderId === userId;
           const theme = getTeamTheme(t.id);
           return (
             <div
               key={t.id}
-              className="team-anim"
+              className="team-anim team-card"
+              role="button"
+              tabIndex={0}
+              aria-label={`Open ${t.name} team`}
               style={{ animationDelay: `${i * 0.06}s`, cursor: "pointer" }}
               onClick={() => setOpenTeamId(t.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setOpenTeamId(t.id);
+                }
+              }}
             >
 
 
@@ -248,6 +262,14 @@ const [openTeamId, setOpenTeamId] = useState<string | null>(null);
 
         <div
           className="team-anim create-tile"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              router.push("/dashboard/my-challenges");
+            }
+          }}
           style={{
             animationDelay: `${teams.length * 0.06}s`,
             border: "2px dashed rgba(109,74,255,0.3)",

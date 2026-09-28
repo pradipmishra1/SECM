@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Icon } from "./icons";
 
 function getFileMeta(url: string) {
@@ -31,18 +31,35 @@ function VerifiedTick() {
 
 function PreviewModal({ url, onClose }: { url: string; onClose: () => void }) {
   const meta = getFileMeta(url);
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
   return (
     <div
+      role="presentation"
       onClick={onClose}
       style={{ position: "fixed", inset: 0, background: "rgba(20,19,43,0.55)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: 24 }}
     >
       <style>{`@keyframes pmPop { from { opacity:0; transform: scale(0.96) translateY(8px); } to { opacity:1; transform: scale(1) translateY(0); } }`}</style>
       <div
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="submission-preview-title"
         style={{
           background: "#fff",
           borderRadius: 16,
-          width: meta.isImage || meta.isPdf ? "min(880px, 92vw)" : 400,
+          width: meta.isImage || meta.isPdf ? "min(880px, 92vw)" : "min(400px, 92vw)",
           height: meta.isImage || meta.isPdf ? "min(82vh, 760px)" : "auto",
           overflow: "hidden",
           animation: "pmPop 0.2s ease",
@@ -52,7 +69,7 @@ function PreviewModal({ url, onClose }: { url: string; onClose: () => void }) {
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid rgba(15,23,42,0.06)", flexShrink: 0 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 700, color: "#14132B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meta.name}</span>
+          <span id="submission-preview-title" style={{ fontSize: 13.5, fontWeight: 700, color: "#14132B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meta.name}</span>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, marginLeft: 12 }}>
             <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: "#6D4AFF", textDecoration: "none", background: "rgba(109,74,255,0.08)", padding: "6px 12px", borderRadius: 8 }}>
               Open in new tab
@@ -110,9 +127,15 @@ export default function SubmissionsListView({ submissions }: { submissions: any[
         .sub-view-btn:hover { background: rgba(109,74,255,0.08) !important; }
         .tab-pill { transition: transform 0.15s ease; }
         .tab-pill:hover { transform: translateY(-1px); }
+        .sub-filter-group { max-width: 100%; }
+        .submissions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 16px; align-items: start; }
+        @media (prefers-reduced-motion: reduce) {
+          .sub-card { animation: none; transition: none; }
+          .sub-view-btn, .tab-pill { transition: none; }
+        }
       `}</style>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
+      <div className="sub-filter-group" role="group" aria-label="Filter submissions" style={{ display: "flex", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
         {[
           { key: "ALL", label: `All (${submissions.length})` },
           { key: "REVIEWED", label: `Reviewed (${reviewedCount})` },
@@ -122,6 +145,7 @@ export default function SubmissionsListView({ submissions }: { submissions: any[
             key={t.key}
             className="tab-pill"
             onClick={() => setFilter(t.key as any)}
+            aria-pressed={filter === t.key}
             style={{
               padding: "8px 16px",
               borderRadius: 10,
@@ -143,7 +167,7 @@ export default function SubmissionsListView({ submissions }: { submissions: any[
           <p style={{ color: "rgba(20,19,43,0.4)", fontSize: 14 }}>No {filter.toLowerCase()} submissions.</p>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16, alignItems: "start" }}>
+        <div className="submissions-grid">
           {filtered.map((s, i) => {
             const isReviewed = !!s.review;
             const sc = isReviewed ? scoreColor(s.review.score) : null;

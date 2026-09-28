@@ -14,13 +14,14 @@ export default function CreateTeamForm({ challengeId }: { challengeId: string })
     setError("");
     setLoading(true);
 
+    try {
     const res = await fetch(`/api/challenges/${challengeId}/teams`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     setLoading(false);
 
     if (!res.ok) {
@@ -29,6 +30,10 @@ export default function CreateTeamForm({ challengeId }: { challengeId: string })
     }
 
     router.push(`/dashboard/challenge/${challengeId}`);
+    } catch {
+      setError("Could not create the team right now. Please try again.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -38,18 +43,21 @@ export default function CreateTeamForm({ challengeId }: { challengeId: string })
         background: "#fff",
         borderRadius: 18,
         border: "1px solid rgba(15,23,42,0.07)",
-        padding: 26,
-        maxWidth: 480,
+        padding: "clamp(18px, 5vw, 28px)",
+        width: "100%",
+        maxWidth: 520,
+        boxShadow: "0 12px 34px rgba(31,25,68,0.05)",
         display: "flex",
         flexDirection: "column",
         gap: 16,
       }}
     >
       <div>
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "rgba(20,19,43,0.5)", marginBottom: 6, textTransform: "uppercase" }}>
+        <label htmlFor="team-name" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "rgba(20,19,43,0.5)", marginBottom: 6, textTransform: "uppercase" }}>
           Team Name
         </label>
         <input
+          id="team-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
@@ -58,7 +66,7 @@ export default function CreateTeamForm({ challengeId }: { challengeId: string })
             width: "100%",
             padding: "12px 14px",
             borderRadius: 10,
-            border: "1px solid rgba(15,23,42,0.08)",
+            border: "1px solid rgba(15,23,42,0.1)",
             background: "#F6F5FB",
             fontSize: 14,
             outline: "none",
@@ -67,7 +75,7 @@ export default function CreateTeamForm({ challengeId }: { challengeId: string })
       </div>
 
       {error && (
-        <div style={{ background: "rgba(255,70,70,0.05)", border: "1px solid rgba(255,70,70,0.15)", borderRadius: 10, padding: "10px 14px", color: "#d32f2f", fontSize: 13 }}>
+        <div role="alert" style={{ background: "rgba(255,70,70,0.05)", border: "1px solid rgba(255,70,70,0.15)", borderRadius: 10, padding: "10px 14px", color: "#d32f2f", fontSize: 13 }}>
           ⚠ {error}
         </div>
       )}

@@ -50,7 +50,14 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="auth-body">
+    <div className="auth-body reset-password-page">
+      <style>{`
+        .reset-password-page .reset-input:focus { border-color: #6D4AFF !important; box-shadow: 0 0 0 4px rgba(109,74,255,0.1); }
+        .reset-password-page .reset-submit { background: linear-gradient(135deg,#6D4AFF,#8B5CF6) !important; box-shadow: 0 8px 22px rgba(109,74,255,0.2); transition: transform 0.18s ease, box-shadow 0.18s ease; }
+        .reset-password-page .reset-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(109,74,255,0.28); }
+        .reset-password-page a:focus-visible, .reset-password-page button:focus-visible { outline: 3px solid #8B5CF6; outline-offset: 3px; }
+        @media (prefers-reduced-motion: reduce) { .reset-password-page .auth-card, .reset-password-page button { animation: none !important; transition: none !important; } }
+      `}</style>
       <div className="auth-card" style={{ maxWidth: 420 }}>
         <div className="auth-brand">
           <LogoMark size={38} />
@@ -80,8 +87,10 @@ function ResetPasswordForm() {
             </p>
 
             <form onSubmit={handleSubmit}>
-              <label style={{ fontSize: 12.5, fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>New Password</label>
+              <label htmlFor="new-password" style={{ fontSize: 12.5, fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>New Password</label>
               <input
+                id="new-password"
+                className="reset-input"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -99,8 +108,10 @@ function ResetPasswordForm() {
                 }}
               />
 
-              <label style={{ fontSize: 12.5, fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>Confirm Password</label>
+              <label htmlFor="confirm-password" style={{ fontSize: 12.5, fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>Confirm Password</label>
               <input
+                id="confirm-password"
+                className="reset-input"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -126,6 +137,7 @@ function ResetPasswordForm() {
 
               <button
                 type="submit"
+                className="reset-submit"
                 disabled={loading}
                 style={{
                   width: "100%",

@@ -97,7 +97,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="auth-body">
+    <div className="auth-body register-page">
+      <style>{`
+        .register-page .auth-btn-submit { background: linear-gradient(135deg,#6D4AFF,#8B5CF6); }
+        .register-page .auth-field-group input:focus, .register-page .auth-field-group select:focus { border-color: rgba(109,74,255,0.5); box-shadow: 0 0 0 4px rgba(109,74,255,0.1); }
+        .register-page a:focus-visible, .register-page button:focus-visible { outline: 3px solid #8B5CF6; outline-offset: 3px; }
+        @media (prefers-reduced-motion: reduce) { .register-page .auth-card, .register-page button { animation: none !important; transition: none !important; } }
+      `}</style>
       <div className="auth-card">
         <div className="auth-brand">
           <LogoMark size={60} />
@@ -265,7 +271,9 @@ export default function RegisterPage() {
               background: "#fff",
               borderRadius: 20,
               padding: 30,
-              width: 380,
+              width: "100%",
+              maxWidth: 380,
+              boxSizing: "border-box",
               boxShadow: "0 30px 60px rgba(20,19,43,0.3)",
             }}
           >

@@ -83,6 +83,7 @@ export default function MessagesApp({ currentUserId }: { currentUserId: string }
   const [sending, setSending] = useState(false);
   const [viewingProfile, setViewingProfile] = useState<string | null>(null);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [threadError, setThreadError] = useState(false);
   const [msgSearchOpen, setMsgSearchOpen] = useState(false);
   const [msgSearchQuery, setMsgSearchQuery] = useState("");
   const [otherTyping, setOtherTyping] = useState(false);
@@ -122,9 +123,13 @@ export default function MessagesApp({ currentUserId }: { currentUserId: string }
     setSearching(true);
     const timer = setTimeout(() => {
       fetch(`/api/users/search?q=${encodeURIComponent(searchQuery)}`)
-        .then((r) => r.json())
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Search unavailable"))))
         .then((d) => {
           setSearchResults(d.users || []);
+          setSearching(false);
+        })
+        .catch(() => {
+          setSearchResults([]);
           setSearching(false);
         });
     }, 300);
@@ -145,17 +150,25 @@ export default function MessagesApp({ currentUserId }: { currentUserId: string }
 
   function loadConversations() {
     fetch("/api/messages/conversations")
-      .then((r) => r.json())
-      .then((d) => setConversations(d.conversations || []));
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Conversations unavailable"))))
+      .then((d) => setConversations(d.conversations || []))
+      .catch(() => setConversations([]));
   }
 
   function loadThread(username: string) {
     setThreadLoading(true);
+    setThreadError(false);
     fetch(`/api/messages/${username}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Conversation unavailable"))))
       .then((d) => {
         setMessages(d.messages || []);
         setOtherUser(d.otherUser || null);
+        setThreadLoading(false);
+      })
+      .catch(() => {
+        setMessages([]);
+        setOtherUser(null);
+        setThreadError(true);
         setThreadLoading(false);
       });
   }
@@ -174,17 +187,22 @@ export default function MessagesApp({ currentUserId }: { currentUserId: string }
     const content = input;
     setInput("");
     setSending(true);
-    const res = await fetch(`/api/messages/${activeUsername}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
-    setSending(false);
-    if (res.ok) {
-      loadThread(activeUsername);
-      loadConversations();
-    } else {
+    try {
+      const res = await fetch(`/api/messages/${activeUsername}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (res.ok) {
+        loadThread(activeUsername);
+        loadConversations();
+      } else {
+        setInput(content);
+      }
+    } catch {
       setInput(content);
+    } finally {
+      setSending(false);
     }
   }
 
@@ -230,8 +248,7 @@ export default function MessagesApp({ currentUserId }: { currentUserId: string }
 
         .head-anim { animation: headIn 0.5s cubic-bezier(.2,.8,.2,1) both; }
         .msg-bubble { animation: msgSlideIn 0.28s cubic-bezier(.2,.8,.2,1) both; }
-        .convo-item { animation: convoFade 0.3s ease both; transition: all 0.2s ease; }
-        .chat-panel { animation: panelFade 0.3s ease; }
+        .convo-item { transition: background 0.2s ease, transform 0.2s ease; }
         .search-spinner { animation: searchSpin 0.6s linear infinite; }
 
         .send-btn { transition: transform 0.15s ease, box-shadow 0.2s ease; }
@@ -240,7 +257,7 @@ export default function MessagesApp({ currentUserId }: { currentUserId: string }
 
         .msg-input:focus { border-color: rgba(109,74,255,0.5) !important; background: #fff !important; box-shadow: 0 0 0 4px rgba(109,74,255,0.1); }
 
-        .unread-dot { animation: unreadPulse 1.8s ease infinite; }
+        .unread-dot { animation: none; }
         .msg-bubble-inner { transition: transform 0.15s ease, box-shadow 0.15s ease; position: relative; }
         .msg-bubble-inner:hover { transform: translateY(-2px); }
         .msg-bubble-inner:hover .msg-delete-btn { opacity: 1; }
@@ -253,7 +270,7 @@ export default function MessagesApp({ currentUserId }: { currentUserId: string }
         .convo-item.active { background: linear-gradient(135deg, rgba(109,74,255,0.1), rgba(139,92,246,0.05)) !important; box-shadow: inset 0 0 0 1.5px rgba(109,74,255,0.25); }
         .convo-item:not(.active):hover { background: #F6F5FB !important; transform: translateX(2px); }
 
-        .thread-header-shine { position: absolute; inset: 0; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.15), transparent); animation: headerShine 3s ease-in-out infinite; }
+        .thread-header-shine { display: none; }
 
         .sidebar-panel::-webkit-scrollbar, .thread-panel::-webkit-scrollbar { width: 6px; }
         .sidebar-panel::-webkit-scrollbar-thumb, .thread-panel::-webkit-scrollbar-thumb { background: rgba(109,74,255,0.15); border-radius: 10px; }
@@ -267,18 +284,22 @@ export default function MessagesApp({ currentUserId }: { currentUserId: string }
         .icon-btn { transition: background 0.15s ease, transform 0.15s ease; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .icon-btn:hover, .icon-btn:active { background: rgba(255,255,255,0.2); transform: scale(0.96); }
 
-        .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(20,19,43,0.4); display: inline-block; animation: typingBounce 1.2s ease-in-out infinite; }
+        .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(20,19,43,0.4); display: inline-block; }
 
         .msg-search-panel { animation: slideInPanel 0.2s ease both; }
 
         /* Mobile responsive: stack list/chat, show one at a time */
         @media (max-width: 820px) {
-          .messages-shell { height: calc(100vh - 170px) !important; }
+          .messages-shell { height: calc(100dvh - 190px) !important; min-height: 430px; }
           .messages-sidebar { display: none !important; }
           .messages-sidebar.mobile-show { display: flex !important; width: 100% !important; border-right: none !important; }
           .messages-chatpanel { display: none !important; }
           .messages-chatpanel.mobile-show { display: flex !important; width: 100% !important; }
           .mobile-back-btn { display: flex !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .head-anim, .msg-bubble, .search-spinner, .msg-search-panel { animation: none !important; }
+          .send-btn, .convo-item, .msg-bubble-inner, .msg-delete-btn, .convo-avatar, .profile-trigger, .icon-btn { transition: none !important; }
         }
       `}</style>
 
@@ -471,6 +492,10 @@ export default function MessagesApp({ currentUserId }: { currentUserId: string }
                     {[0, 1, 2].map((i) => (
                       <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: "#6D4AFF", animation: `dotBounce 1s ease-in-out ${i * 0.15}s infinite` }} />
                     ))}
+                  </div>
+                ) : threadError ? (
+                  <div role="status" style={{ display: "grid", placeItems: "center", height: "100%", color: "rgba(20,19,43,0.5)", fontSize: 13, textAlign: "center" }}>
+                    Could not load this conversation. Try selecting it again.
                   </div>
                 ) : filteredMessages.length === 0 ? (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "rgba(20,19,43,0.35)", fontSize: 13 }}>

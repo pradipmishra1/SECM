@@ -371,7 +371,7 @@ export default function ProfileEditor({
   ];
 
   return (
-        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+        <div className="profile-page">
       <style>{`
         @keyframes profRise { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: translateY(0); } }
         @keyframes flipIn { from { opacity:0; transform: scale(0.97) translateY(6px); } to { opacity:1; transform: scale(1) translateY(0); } }
@@ -441,6 +441,42 @@ export default function ProfileEditor({
 
         .badge-float { animation: badgeFloat 2.4s ease-in-out infinite; }
 
+        .profile-page { max-width: 1400px; width: 100%; min-width: 0; margin: 0 auto; }
+        .profile-stats { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+        .profile-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .profile-tabs { overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+        .profile-tabs::-webkit-scrollbar { display: none; }
+        .profile-banner { height: 180px !important; }
+        .profile-identity-row { display: grid !important; grid-template-columns: minmax(0, 1fr) auto auto auto auto auto; align-items: center; gap: 16px; }
+        .profile-identity-main { min-width: 0; }
+        .profile-share, .profile-edit { white-space: nowrap; }
+        .profile-page .profile-card { min-width: 0; }
+        .profile-stat-card { background: linear-gradient(155deg,#EDE9FE,#F5F3FF) !important; }
+        .profile-stat-card > div:nth-child(4) { color: #6D4AFF !important; }
+        .banner-blur-2 { background: rgba(139,92,246,0.2) !important; }
+        @media (max-width: 900px) {
+          .profile-stats { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+          .profile-overview-grid { grid-template-columns: minmax(0, 1fr) !important; }
+        }
+        @media (max-width: 600px) {
+          .profile-banner { height: 132px !important; border-radius: 18px !important; }
+          .profile-identity-row { margin-top: -86px !important; padding: 0 14px !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px !important; }
+          .profile-identity-main { grid-column: 1 / -1; align-items: center !important; gap: 12px !important; }
+          .profile-identity-main > div:first-child { width: 76px !important; height: 76px !important; }
+          .profile-identity-main > div:first-child > div { width: 80px !important; height: 80px !important; border-radius: 22px !important; }
+          .profile-identity-main h1 { font-size: 20px !important; }
+          .profile-follow-stat { padding: 8px 0; }
+          .profile-follow-stat > div:first-child { font-size: 22px !important; }
+          .profile-follow-stat > div:last-child { font-size: 12px !important; }
+          .profile-share, .profile-edit { padding: 9px 12px !important; font-size: 13px !important; }
+          .profile-social { gap: 6px !important; }
+          .profile-social > a, .profile-social > button { width: 36px !important; height: 36px !important; }
+          .profile-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+          .profile-tabs { gap: 20px !important; padding: 0 2px !important; }
+          .profile-page .profile-card { padding: 18px !important; }
+          .profile-page .profile-achievements { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
+        }
+        .locked-shimmer, .glow-pulse, .banner-blur-1, .banner-blur-2, .banner-blur-3, .avatar-ring-anim, .avatar-glow-anim, .banner-sheen, .badge-float { animation: none !important; }
         @media (prefers-reduced-motion: reduce) {
           .banner-blur-1, .banner-blur-2, .banner-blur-3, .glow-pulse, .locked-shimmer, .avatar-ring-anim, .avatar-glow-anim, .banner-sheen, .badge-float { animation: none !important; }
         }
@@ -449,7 +485,7 @@ export default function ProfileEditor({
       {/* Outer wrapper: NOT clipped, holds both the banner and the overlapping identity row */}
       <div className="prof-anim" style={{ position: "relative", marginBottom: 22 }}>
                 {/* Soft blurred banner */}
-                <div style={{ position: "relative", height: 210, borderRadius: 24, overflow: "hidden", background: "linear-gradient(135deg,#F5F3FF,#EDE9FE)" }}>
+                <div className="profile-banner" style={{ position: "relative", height: 210, borderRadius: 24, overflow: "hidden", background: "linear-gradient(135deg,#F5F3FF,#EDE9FE)" }}>
           <div className="banner-blur-1" style={{ top: -40, left: "10%", width: 220, height: 220, background: "rgba(109,74,255,0.35)" }} />
           <div className="banner-blur-2" style={{ top: -20, right: "15%", width: 180, height: 180, background: "rgba(236,72,153,0.25)" }} />
           <div className="banner-blur-1" style={{ bottom: -60, left: "40%", width: 200, height: 200, background: "rgba(139,92,246,0.3)", animationDelay: "2s" }} />
@@ -458,8 +494,8 @@ export default function ProfileEditor({
         </div>
 
                {/* Identity row sits BELOW the banner div in the DOM, but pulled up visually to overlap it */}
-        <div style={{ position: "relative", marginTop: -142, padding: "0 22px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 18 }}>
+        <div className="profile-identity-row" style={{ position: "relative", marginTop: -142, padding: "0 22px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <div className="profile-identity-main" style={{ display: "flex", alignItems: "flex-end", gap: 18 }}>
 
 
                     <div className="avatar-glow-anim" style={{ width: 112, height: 112, flexShrink: 0 }}>
@@ -506,22 +542,22 @@ export default function ProfileEditor({
           </div>
         </div>
 
-          <div className="follow-stat-hover" onClick={() => openFollowModal("followers")} style={{ textAlign: "center" }}>
+          <div className="follow-stat-hover profile-follow-stat" onClick={() => openFollowModal("followers")} style={{ textAlign: "center" }}>
             <div className="stat-number-anim" style={{ fontFamily: "'Sora', sans-serif", fontSize: 28, fontWeight: 800, color: "#14132B" }}>{stats?.followerCount ?? 0}</div>
             <div style={{ fontSize: 18, color: "rgba(20,19,43,0.45)", fontWeight: 600 }}>Followers</div>
           </div>
-          <div className="follow-stat-hover" onClick={() => openFollowModal("following")} style={{ textAlign: "center" }}>
+          <div className="follow-stat-hover profile-follow-stat" onClick={() => openFollowModal("following")} style={{ textAlign: "center" }}>
             <div className="stat-number-anim" style={{ fontFamily: "'Sora', sans-serif", fontSize: 28, fontWeight: 800, color: "#14132B", animationDelay: "0.08s" }}>{stats?.followingCount ?? 0}</div>
             <div style={{ fontSize: 18, color: "rgba(20,19,43,0.45)", fontWeight: 600 }}>Following</div>
           </div>
-                  <button
-            className="btn-anim"
+          <button
+            className="btn-anim profile-share"
             onClick={copyProfileLink}
             style={{ background: "#fff", color: "#6D4AFF", border: "1.5px solid rgba(109,74,255,0.25)", borderRadius: 10, padding: "9px 16px", fontSize: 18, fontWeight: 700, cursor: "pointer" }}
           >
             {copied ? "✓ Copied!" : "🔗 Share"}
           </button>
-                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                   <div className="profile-social" style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {githubUrl ? (
               
                <a href={githubUrl}
@@ -567,7 +603,7 @@ export default function ProfileEditor({
             )}
           </div>
                                         <button
-            className="btn-anim"
+            className="btn-anim profile-edit"
             onClick={() => setEditing(true)}
             style={{ background: "linear-gradient(135deg,#6D4AFF,#8B5CF6)", color: "#fff", border: "none", borderRadius: 10, padding: "9px 20px", fontSize: 20, fontWeight: 700, cursor: "pointer", boxShadow: "0 6px 16px rgba(109,74,255,0.3)" }}
           >
@@ -577,7 +613,7 @@ export default function ProfileEditor({
       </div>
 
       {/* Tabs */}
-      <div className="prof-anim" style={{ animationDelay: "0.08s", display: "flex", gap: 26, borderBottom: "1px solid rgba(15,23,42,0.08)", marginBottom: 22, padding: "0 8px" }}>
+      <div className="prof-anim profile-tabs" style={{ animationDelay: "0.08s", display: "flex", gap: 26, borderBottom: "1px solid rgba(15,23,42,0.08)", marginBottom: 22, padding: "0 8px" }}>
         {TABS.map((t) => (
           <button key={t.key} className="tab-btn" onClick={() => setTab(t.key)} style={{ color: tab === t.key ? "#14132B" : "rgba(20,19,43,0.4)" }}>
             {t.label}
@@ -593,7 +629,7 @@ export default function ProfileEditor({
 
 
           {role === "STUDENT" && stats && (
-            <div className="prof-anim" style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginBottom: 20 }}>
+            <div className="prof-anim profile-stats" style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginBottom: 20 }}>
               <div onClick={handleWinsCardClick} style={{ cursor: "pointer" }}>
                 <StatCard icon="🏆" label="Wins" value={stats.wins} tone="#D4A017" grad="linear-gradient(155deg,#FEF3C7,#FFFBEB)" />
               </div>
@@ -606,7 +642,7 @@ export default function ProfileEditor({
           )}
 
           {role === "ORGANIZER" && stats && (
-            <div className="prof-anim" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
+            <div className="prof-anim profile-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
               <StatCard icon="🚩" label="Total Challenges" value={stats.totalChallenges || 0} tone="#6D4AFF" grad="linear-gradient(155deg,#EDE9FE,#F5F3FF)" />
               <StatCard icon="⏱️" label="Active Now" value={stats.activeChallenges || 0} tone="#2563EB" grad="linear-gradient(155deg,#DBEAFE,#EFF6FF)" />
               <StatCard icon="📤" label="Total Submissions" value={stats.totalSubmissions || 0} tone="#D97706" grad="linear-gradient(155deg,#FEF3C7,#FFFBEB)" />
@@ -614,8 +650,8 @@ export default function ProfileEditor({
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: role === "STUDENT" ? "1fr 1fr" : "1fr", gap: 16 }}>
-            <div className="prof-anim" style={{ animationDelay: "0.1s", ...cardBase }}>
+          <div className="profile-overview-grid" style={{ display: "grid", gridTemplateColumns: role === "STUDENT" ? "1fr 1fr" : "1fr", gap: 16 }}>
+            <div className="prof-anim profile-card" style={{ animationDelay: "0.1s", ...cardBase }}>
               <h3 style={cardTitle}>👤 About Me</h3>
 
               {role === "ORGANIZER" && (
@@ -673,7 +709,7 @@ export default function ProfileEditor({
             </div>
 
             {role === "STUDENT" && (
-              <div className="prof-anim" style={{ animationDelay: "0.15s", ...cardBase }}>
+              <div className="prof-anim profile-card" style={{ animationDelay: "0.15s", ...cardBase }}>
                 <h3 style={cardTitle}>⚡ Recent Activity</h3>
                 {recentActivity.length === 0 ? (
                   <p style={{ fontSize: 13, color: "rgba(20,19,43,0.4)" }}>No activity yet.</p>

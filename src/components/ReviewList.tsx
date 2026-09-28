@@ -8,7 +8,8 @@ import { Icon } from "./icons";
 function getFileMeta(url: string) {
   const clean = url.split("?")[0];
   const ext = clean.split(".").pop()?.toLowerCase() || "";
-  const name = decodeURIComponent(clean.split("/").pop() || "submission file");
+  let name = clean.split("/").pop() || "submission file";
+  try { name = decodeURIComponent(name); } catch { /* Keep the encoded name if the URL is malformed. */ }
   const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext);
   const isPdf = ext === "pdf";
   const isZip = ["zip", "rar", "7z"].includes(ext);
@@ -19,34 +20,48 @@ function getFileMeta(url: string) {
 function SubmissionFilesModal({ submission, onClose }: { submission: any; onClose: () => void }) {
   const submitterName = submission.user ? submission.user.name : submission.team ? submission.team.name : "Unknown";
   const files = submission.fileUrl ? [submission.fileUrl] : [];
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
 
   return (
     <div
+      role="presentation"
       onClick={onClose}
       style={{
         position: "fixed", inset: 0, background: "rgba(20,19,43,0.5)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, animation: "sfmFadeBg 0.2s ease",
+        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16,
       }}
     >
       <style>{`
-        @keyframes sfmFadeBg { from { opacity:0 } to { opacity:1 } }
         @keyframes sfmPop { from { opacity:0; transform: scale(0.94) translateY(10px); } to { opacity:1; transform: scale(1) translateY(0); } }
-        .sfm-card { transition: transform 0.2s cubic-bezier(.34,1.56,.64,1), box-shadow 0.25s ease; }
-        .sfm-card:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(109,74,255,0.35); }
-        .sfm-shine { position: absolute; inset: 0; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%); animation: sfmShine 3.5s ease-in-out infinite; }
-        @keyframes sfmShine { 0% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+        .sfm-card { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+        .sfm-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(45,35,100,0.18); }
         .sfm-open-btn { transition: transform 0.15s ease, box-shadow 0.2s ease; }
         .sfm-open-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(109,74,255,0.3); }
+        @media (prefers-reduced-motion: reduce) { .sfm-card, .sfm-open-btn { transition: none; } }
       `}</style>
       <div
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="review-files-title"
         style={{
-          background: "#fff", borderRadius: 24, padding: 28, width: 440, animation: "sfmPop 0.3s cubic-bezier(.2,.8,.2,1)",
+          background: "#fff", borderRadius: 20, padding: 24, width: "min(440px, 92vw)", boxSizing: "border-box", animation: "sfmPop 0.22s ease-out",
           boxShadow: "0 30px 60px rgba(20,19,43,0.25)",
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 17, fontWeight: 700, color: "#14132B" }}>Submitted Files</h3>
+          <h3 id="review-files-title" style={{ fontFamily: "'Sora', sans-serif", fontSize: 17, fontWeight: 700, color: "#14132B" }}>Submitted Files</h3>
           <button onClick={onClose} style={{ background: "rgba(20,19,43,0.05)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: 15, color: "rgba(20,19,43,0.5)" }}>✕</button>
         </div>
 
@@ -69,7 +84,6 @@ function SubmissionFilesModal({ submission, onClose }: { submission: any; onClos
                     color: "#fff",
                   }}
                 >
-                  <div className="sfm-shine" />
                   <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 26 }}>
                     <span style={{ fontSize: 26 }}>{meta.icon}</span>
                     <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, opacity: 0.7, background: "rgba(255,255,255,0.15)", padding: "4px 10px", borderRadius: 20 }}>
@@ -113,6 +127,7 @@ export default function ReviewList({
   const [error, setError] = useState("");
   const [rubric, setRubric] = useState<any[]>([]);
   const [rubricLoading, setRubricLoading] = useState(true);
+  const [rubricError, setRubricError] = useState("");
   const [viewingSubmission, setViewingSubmission] = useState<any>(null);
   const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
   const [aiResults, setAiResults] = useState<Record<string, { score: number; feedback: string }>>({});
@@ -141,29 +156,46 @@ export default function ReviewList({
     setSavingId(submissionId);
     setError("");
     const scoreOutOf10 = Math.round((aiScore100 / 100) * 10);
-    const res = await fetch("/api/submissions/" + submissionId + "/review", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ score: scoreOutOf10, feedback: aiFeedback }),
-    });
-    setSavingId(null);
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.error || "Failed to accept AI score");
-      return;
+    try {
+      const res = await fetch("/api/submissions/" + submissionId + "/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ score: scoreOutOf10, feedback: aiFeedback }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to accept AI score");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Could not save the review. Check your connection and try again.");
+    } finally {
+      setSavingId(null);
     }
-    router.refresh();
   }
 
   useEffect(() => {
     if (!selectedChallengeId) return;
+    const controller = new AbortController();
     setRubricLoading(true);
-    fetch(`/api/challenges/${selectedChallengeId}/rubric`)
-      .then((r) => r.json())
+    setRubricError("");
+    fetch(`/api/challenges/${selectedChallengeId}/rubric`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error("Unable to load scoring criteria.");
+        return r.json();
+      })
       .then((d) => {
         setRubric(d.criteria || []);
         setRubricLoading(false);
-      });
+      })
+      .catch((error) => {
+        if (error instanceof Error && error.name === "AbortError") return;
+        setRubric([]);
+        setRubricLoading(false);
+        setRubricError("Scoring criteria could not be loaded. Standard scoring is available.");
+      })
+    return () => controller.abort();
   }, [selectedChallengeId]);
 
   function changeChallenge(id: string) {
@@ -208,20 +240,23 @@ export default function ReviewList({
     }
 
     setSavingId(submissionId);
-    const res = await fetch("/api/submissions/" + submissionId + "/review", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setSavingId(null);
-
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.error || "Failed to save review");
-      return;
+    try {
+      const res = await fetch("/api/submissions/" + submissionId + "/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to save review");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Could not save the review. Check your connection and try again.");
+    } finally {
+      setSavingId(null);
     }
-
-    router.refresh();
   }
 
   const scoreInputStyle: React.CSSProperties = {
@@ -239,10 +274,10 @@ export default function ReviewList({
   const feedbackInputStyle: React.CSSProperties = {
     padding: "9px 12px",
     borderRadius: 10,
-    border: "1px solid rgba(37,99,235,0.12)",
-    background: "rgba(37,99,235,0.04)",
+    border: "1px solid rgba(109,74,255,0.12)",
+    background: "rgba(109,74,255,0.04)",
     fontSize: 13,
-    color: "#1E3A8A",
+    color: "#4C2FCC",
     outline: "none",
     boxSizing: "border-box",
   };
@@ -255,14 +290,18 @@ export default function ReviewList({
         .tab-pill { transition: transform 0.15s ease; }
         .tab-pill:hover { transform: translateY(-1px); }
         .rl-score-input:focus { border-color: rgba(109,74,255,0.4) !important; box-shadow: 0 0 0 3px rgba(109,74,255,0.1); background: #fff !important; }
-        .rl-feedback-input:focus { border-color: rgba(37,99,235,0.35) !important; box-shadow: 0 0 0 3px rgba(37,99,235,0.08); background: #fff !important; }
+        .rl-feedback-input:focus { border-color: rgba(109,74,255,0.4) !important; box-shadow: 0 0 0 3px rgba(109,74,255,0.1); background: #fff !important; }
         .rl-save-btn { transition: transform 0.15s ease, box-shadow 0.2s ease; }
         .rl-save-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(20,19,43,0.2); }
         .rl-link { transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 4px; }
         .rl-link:hover { gap: 7px; background: rgba(109,74,255,0.06) !important; }
+        .rl-challenge-tabs { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; scrollbar-width: thin; }
+        .rl-challenge-tabs > button { flex: 0 0 auto; }
+        .rl-submission-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 18px; }
+        @media (prefers-reduced-motion: reduce) { .rl-anim, .tab-pill, .rl-save-btn, .rl-link { animation: none; transition: none; } }
       `}</style>
 
-      <div style={{ marginBottom: 20, display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div className="rl-challenge-tabs" role="group" aria-label="Choose a challenge">
         {challenges.map(function (c) {
           const isActive = c.id === selectedChallengeId;
           return (
@@ -270,6 +309,7 @@ export default function ReviewList({
               key={c.id}
               className="tab-pill"
               onClick={function () { changeChallenge(c.id); }}
+              aria-pressed={isActive}
               style={{
                 padding: "8px 14px",
                 borderRadius: 20,
@@ -293,6 +333,12 @@ export default function ReviewList({
         </div>
       )}
 
+      {rubricError && (
+        <div role="status" style={{ background: "rgba(109,74,255,0.06)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "#6D4AFF", fontWeight: 600 }}>
+          {rubricError}
+        </div>
+      )}
+
       {error ? (
         <div style={{ background: "rgba(255,70,70,0.05)", border: "1px solid rgba(255,70,70,0.15)", borderRadius: 10, padding: "10px 14px", color: "#d32f2f", fontSize: 13, marginBottom: 16 }}>
           {error}
@@ -305,7 +351,7 @@ export default function ReviewList({
           <p style={{ color: "rgba(20,19,43,0.4)", fontSize: 14 }}>No submissions for this challenge yet.</p>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 18 }}>
+        <div className="rl-submission-grid">
           {submissions.map(function (s, i) {
             const submitterName = s.user ? s.user.name : (s.team ? s.team.name : "Unknown");
             const alreadyScored = !!s.review;

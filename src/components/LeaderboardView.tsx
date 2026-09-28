@@ -42,19 +42,34 @@ export default function LeaderboardView({
   const [scope, setScope] = useState("global");
   const [board, setBoard] = useState(globalBoard || []);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     if (scope === "global") {
       setBoard(globalBoard || []);
+      setLoadError("");
+      setLoading(false);
       return;
     }
+    const controller = new AbortController();
     setLoading(true);
-    fetch(`/api/leaderboard?challengeId=${scope}`)
-      .then((res) => res.json())
+    setLoadError("");
+    fetch(`/api/leaderboard?challengeId=${scope}`, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error("Unable to load this leaderboard.");
+        return res.json();
+      })
       .then((data) => {
         setBoard(data.board || []);
         setLoading(false);
+      })
+      .catch((error) => {
+        if (error instanceof Error && error.name === "AbortError") return;
+        setBoard([]);
+        setLoadError("We couldn’t load this leaderboard. Please try another scope.");
+        setLoading(false);
       });
+    return () => controller.abort();
   }, [scope, globalBoard]);
 
   const podium = board.slice(0, 3);
@@ -63,27 +78,29 @@ export default function LeaderboardView({
   return (
     <div style={{ fontFamily: "'Inter', sans-serif" }}>
       <style>{`
-        @keyframes lbRise { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform: translateY(0); } }
-        @keyframes podiumPop { from { opacity:0; transform: scale(0.85) translateY(20px); } to { opacity:1; transform: scale(1) translateY(0); } }
-        @keyframes barGrow { from { height: 0; } }
-        @keyframes crownFloat { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-4px) rotate(-5deg); } }
-        @keyframes crownGlow { 0%,100% { filter: drop-shadow(0 0 3px rgba(234,179,8,0.4)); } 50% { filter: drop-shadow(0 0 9px rgba(234,179,8,0.7)); } }
-        @keyframes rowFadeIn { from { opacity:0; transform: translateX(-10px); } to { opacity:1; transform: translateX(0); } }
-        @keyframes lbSpin { to { transform: rotate(360deg); } }
-        @keyframes numberPop { from { opacity:0; transform: scale(0.5); } to { opacity:1; transform: scale(1); } }
-        @keyframes avatarPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(109,74,255,0.4); } 50% { box-shadow: 0 0 0 5px rgba(109,74,255,0); } }
-        .lb-anim { animation: lbRise 0.4s cubic-bezier(.2,.8,.2,1) both; }
-        .podium-card { animation: podiumPop 0.55s cubic-bezier(.2,.9,.3,1.2) both; }
-        .podium-bar { animation: barGrow 0.6s cubic-bezier(.2,.8,.2,1) both; transform-origin: bottom; }
-        .crown-float { animation: crownFloat 2s ease-in-out infinite, crownGlow 2s ease-in-out infinite; display: inline-block; }
-        .points-pop { animation: numberPop 0.4s cubic-bezier(.34,1.56,.64,1) both; }
-        .lb-row { animation: rowFadeIn 0.35s cubic-bezier(.2,.8,.2,1) both; transition: background 0.15s ease, transform 0.15s ease; }
-        .lb-row:hover { background: #F5F3FF; transform: translateX(4px); }
-        .lb-row-me { animation: avatarPulse 2.2s ease-in-out infinite; border-radius: 50%; }
-        .podium-avatar { transition: transform 0.25s cubic-bezier(.34,1.56,.64,1); }
-        .podium-card:hover .podium-avatar { transform: scale(1.1) rotate(-4deg); }
-        .scope-tab { transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease; cursor: pointer; }
-        .scope-tab:active { transform: scale(0.95); }
+        @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .lb-anim, .podium-card, .lb-row { animation: fadeSlideIn 0.32s ease-out both; }
+        .lb-row { transition: background-color 0.18s ease; }
+        .lb-row:hover { background: #F5F3FF; }
+        .lb-row-me { border-radius: 50%; box-shadow: 0 0 0 3px rgba(109,74,255,0.12); }
+        .podium-avatar { transition: transform 0.18s ease; }
+        .podium-card:hover .podium-avatar { transform: translateY(-2px); }
+        .scope-tab { flex: 0 0 auto; transition: background-color 0.18s ease, color 0.18s ease; cursor: pointer; }
+        .lb-scope-tabs { width: 100% !important; max-width: 100%; flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: thin; }
+        .lb-podium { display: grid; grid-template-columns: repeat(3, minmax(0, 170px)); align-items: end; justify-content: center; gap: 18px; }
+        .lb-podium-item { width: 100% !important; min-width: 0; }
+        @media (max-width: 560px) {
+          .lb-podium { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+          .lb-podium .podium-avatar { width: 52px !important; height: 52px !important; }
+          .lb-podium-item > p { font-size: 12px !important; min-height: 34px; display: flex; align-items: center; justify-content: center; }
+          .lb-podium-bar { padding-top: 12px !important; }
+          .lb-podium-points { font-size: 18px !important; }
+          .lb-row { padding: 13px 12px !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .lb-anim, .podium-card, .lb-row { animation: none; }
+          .lb-row, .podium-avatar, .scope-tab { transition: none; }
+        }
       `}</style>
 
       {/* Header */}
@@ -95,10 +112,11 @@ export default function LeaderboardView({
       </div>
 
       {/* Scope tabs */}
-      <div className="lb-anim" style={{ display: "flex", gap: 6, marginBottom: 32, background: "rgba(15,23,42,0.04)", padding: 6, borderRadius: 14, width: "fit-content", flexWrap: "wrap" }}>
+      <div className="lb-anim lb-scope-tabs" role="group" aria-label="Leaderboard scope" style={{ display: "flex", gap: 6, marginBottom: 32, background: "rgba(15,23,42,0.04)", padding: 6, borderRadius: 14, width: "fit-content", flexWrap: "wrap" }}>
         <button
           className="scope-tab"
           onClick={() => setScope("global")}
+          aria-pressed={scope === "global"}
           style={{
             padding: "9px 18px",
             borderRadius: 10,
@@ -116,6 +134,7 @@ export default function LeaderboardView({
             key={c.id}
             className="scope-tab"
             onClick={() => setScope(c.id)}
+            aria-pressed={scope === c.id}
             style={{
               padding: "9px 18px",
               borderRadius: 10,
@@ -133,8 +152,12 @@ export default function LeaderboardView({
       </div>
 
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-          <div style={{ width: 30, height: 30, border: "3px solid rgba(109,74,255,0.15)", borderTop: "3px solid #6D4AFF", borderRadius: "50%", animation: "lbSpin 0.7s linear infinite" }} />
+        <div role="status" aria-live="polite" style={{ background: "#fff", borderRadius: 16, border: "1px solid rgba(15,23,42,0.07)", padding: 40, textAlign: "center", color: "rgba(20,19,43,0.5)", fontSize: 14 }}>
+          Loading leaderboard…
+        </div>
+      ) : loadError ? (
+        <div role="alert" style={{ background: "#fff", borderRadius: 16, border: "1px solid rgba(15,23,42,0.07)", padding: 40, textAlign: "center", color: "rgba(20,19,43,0.55)", fontSize: 14 }}>
+          {loadError}
         </div>
       ) : board.length === 0 ? (
         <div style={{ background: "#fff", borderRadius: 18, border: "1px solid rgba(15,23,42,0.07)", padding: 50, textAlign: "center" }}>
@@ -144,9 +167,9 @@ export default function LeaderboardView({
         <>
           {/* Podium */}
           {podium.length > 0 && (
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 20, marginBottom: 32, justifyContent: "center", flexWrap: "wrap" }}>
+            <div className="lb-podium" style={{ marginBottom: 32 }}>
               {[podium[1], podium[0], podium[2]].map((entry, idx) => {
-                if (!entry) return <div key={idx} style={{ width: 170 }} />;
+                if (!entry) return <div key={idx} aria-hidden="true" />;
                 const rank = idx === 1 ? 0 : idx === 0 ? 1 : 2;
                 const height = rank === 0 ? 140 : rank === 1 ? 110 : 90;
                 const isMe = entry.name === currentUserName;
@@ -154,7 +177,7 @@ export default function LeaderboardView({
                 return (
                   <div
                     key={rank}
-                    className="podium-card"
+                    className="podium-card lb-podium-item"
                     style={{ animationDelay: `${rank * 0.1}s`, width: 170, display: "flex", flexDirection: "column", alignItems: "center" }}
                   >
                                         {rank === 0 && <span className="crown-float" style={{ fontSize: 24, marginBottom: 6 }}>👑</span>}
@@ -176,7 +199,7 @@ export default function LeaderboardView({
                       {entry.name} {isMe && <span style={{ color: "#6D4AFF" }}>(You)</span>}
                     </p>
                     <div
-                      className="podium-bar"
+                      className="podium-bar lb-podium-bar"
                       style={{
                         width: "100%",
                         height,
@@ -192,7 +215,7 @@ export default function LeaderboardView({
                         animationDelay: `${rank * 0.1 + 0.15}s`,
                       }}
                     >
-                      <span className="points-pop" style={{ animationDelay: `${rank * 0.1 + 0.4}s`, fontFamily: "'Sora', sans-serif", fontSize: 24, fontWeight: 800, color: theme.text }}>{entry.points.toLocaleString()}</span>
+                      <span className="lb-podium-points" style={{ fontFamily: "'Sora', sans-serif", fontSize: 24, fontWeight: 800, color: theme.text }}>{entry.points.toLocaleString()}</span>
                       <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(20,19,43,0.35)", letterSpacing: 0.5, marginTop: 2 }}>PTS</span>
                       <span style={{ fontSize: 11, fontWeight: 800, color: theme.text, letterSpacing: 0.5, marginTop: "auto", marginBottom: 12 }}>{RANK_LABEL[rank]}</span>
                     </div>

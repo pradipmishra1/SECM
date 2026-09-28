@@ -45,7 +45,7 @@ export default function SubmitWorkForm({
       body: formData,
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
       throw new Error(data.error || "File upload failed");
@@ -79,13 +79,14 @@ export default function SubmitWorkForm({
 
     setLoading(true);
 
+    try {
     const res = await fetch(`/api/challenges/${challengeId}/submissions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fileUrl: finalFileUrl, description, teamId }),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     setLoading(false);
 
     if (!res.ok) {
@@ -95,6 +96,10 @@ export default function SubmitWorkForm({
 
     setSuccess(true);
     setTimeout(() => router.push(`/dashboard/challenge/${challengeId}`), 1200);
+    } catch {
+      setLoading(false);
+      setError("Could not save your submission. Please try again.");
+    }
   }
 
   const busy = loading || uploading;
@@ -106,8 +111,9 @@ export default function SubmitWorkForm({
         background: "#fff",
         borderRadius: 18,
         border: "1px solid rgba(15,23,42,0.07)",
-        padding: 26,
-        maxWidth: 560,
+        padding: "clamp(18px, 5vw, 28px)",
+        width: "100%",
+        maxWidth: 600,
         display: "flex",
         flexDirection: "column",
         gap: 18,
@@ -116,20 +122,25 @@ export default function SubmitWorkForm({
     >
       <style>{`
         @keyframes sfIn { from { opacity:0; transform: translateY(10px);} to { opacity:1; transform: translateY(0);} }
-        @keyframes pulseBorder { 0%,100% { border-color: rgba(109,74,255,0.35); } 50% { border-color: rgba(109,74,255,0.7); } }
-        .drop-zone { transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease; }
+        .drop-zone { transition: background 0.2s ease, border-color 0.2s ease; }
         .drop-zone:hover { background: #F6F4FF; }
-        .drop-zone.active { animation: pulseBorder 1s ease infinite; background: #F1EEFF; transform: scale(1.01); }
+        .drop-zone.active { border-color: #6D4AFF !important; background: #F1EEFF; }
+        .drop-zone:focus-visible { outline: 3px solid rgba(109,74,255,0.3); outline-offset: 3px; }
         .sub-btn { transition: transform 0.15s ease, box-shadow 0.25s ease; }
         .sub-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(109,74,255,0.3); }
+        @media (prefers-reduced-motion: reduce) { .sub-btn, .drop-zone { transition: none !important; } }
       `}</style>
 
       <div>
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "rgba(20,19,43,0.5)", marginBottom: 8, textTransform: "uppercase" }}>
+        <label id="submission-file-label" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "rgba(20,19,43,0.5)", marginBottom: 8, textTransform: "uppercase" }}>
           Attach File or Folder
         </label>
         <div
           className={"drop-zone" + (dragActive ? " active" : "")}
+          role="button"
+          tabIndex={0}
+          aria-labelledby="submission-file-label"
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputRef.current?.click(); } }}
           onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
           onDragLeave={() => setDragActive(false)}
           onDrop={handleDrop}
@@ -174,10 +185,11 @@ export default function SubmitWorkForm({
       </div>
 
       <div>
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "rgba(20,19,43,0.5)", marginBottom: 6, textTransform: "uppercase" }}>
+        <label htmlFor="project-link" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "rgba(20,19,43,0.5)", marginBottom: 6, textTransform: "uppercase" }}>
           Project Link
         </label>
         <input
+          id="project-link"
           value={fileUrl}
           onChange={(e) => setFileUrl(e.target.value)}
           placeholder="https://github.com/you/project"
@@ -196,10 +208,11 @@ export default function SubmitWorkForm({
       </div>
 
       <div>
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "rgba(20,19,43,0.5)", marginBottom: 6, textTransform: "uppercase" }}>
+        <label htmlFor="project-description" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "rgba(20,19,43,0.5)", marginBottom: 6, textTransform: "uppercase" }}>
           Title / Description
         </label>
         <textarea
+          id="project-description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What did you build?"
@@ -219,13 +232,13 @@ export default function SubmitWorkForm({
       </div>
 
       {error && (
-        <div style={{ background: "rgba(255,70,70,0.05)", border: "1px solid rgba(255,70,70,0.15)", borderRadius: 10, padding: "10px 14px", color: "#d32f2f", fontSize: 13, animation: "sfIn 0.3s ease" }}>
+        <div role="alert" style={{ background: "rgba(255,70,70,0.05)", border: "1px solid rgba(255,70,70,0.15)", borderRadius: 10, padding: "10px 14px", color: "#d32f2f", fontSize: 13 }}>
           ⚠ {error}
         </div>
       )}
 
       {success && (
-        <div style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.2)", borderRadius: 10, padding: "10px 14px", color: "#15803D", fontSize: 13, animation: "sfIn 0.3s ease" }}>
+        <div role="status" style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.2)", borderRadius: 10, padding: "10px 14px", color: "#15803D", fontSize: 13 }}>
           ✓ Submitted successfully! Redirecting...
         </div>
       )}

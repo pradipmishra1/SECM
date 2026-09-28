@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TiltCard from "./TiltCard";
 import MedalIcon from "./MedalIcon";
 
 const MEDAL: Record<number, { color: string; label: string; grad: string }> = {
-  1: { color: "#D4A017", label: "1st Place", grad: "linear-gradient(155deg,#4A3A0D 0%,#6B5316 50%,#4A3A0D 100%)" },
-  2: { color: "#9CA3AF", label: "2nd Place", grad: "linear-gradient(160deg,#2A2E33,#3F454D)" },
-  3: { color: "#B45309", label: "3rd Place", grad: "linear-gradient(160deg,#3A2410,#5C3A1B)" },
+  1: { color: "#D4A017", label: "1st Place", grad: "linear-gradient(155deg,#35216F 0%,#4C32A0 55%,#35216F 100%)" },
+  2: { color: "#9CA3AF", label: "2nd Place", grad: "linear-gradient(160deg,#302A4D,#443B68)" },
+  3: { color: "#B45309", label: "3rd Place", grad: "linear-gradient(160deg,#38234F,#52346F)" },
 };
 
 function timeAgo(dateStr: string) {
@@ -28,6 +28,19 @@ function WinDetailModal({ wins, initialPosition, onClose }: { wins: any[]; initi
   wins.forEach((w) => { if (w.position === 1) counts[1]++; else if (w.position === 2) counts[2]++; else counts[3]++; });
   const m = MEDAL[filter];
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
+
   function shareText() {
     const text = `I've won ${wins.length} challenge${wins.length !== 1 ? "s" : ""} on SECM — ${counts[1]} gold, ${counts[2]} silver, ${counts[3]} bronze!`;
     navigator.clipboard?.writeText(text);
@@ -36,7 +49,7 @@ function WinDetailModal({ wins, initialPosition, onClose }: { wins: any[]; initi
   }
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(20,19,43,0.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: 20 }}>
+    <div role="presentation" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(20,19,43,0.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: 20 }}>
       <style>{`
         @keyframes wdmPop { from { opacity:0; transform: scale(0.94) translateY(10px); } to { opacity:1; transform: scale(1) translateY(0); } }
         @keyframes wdmRise { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
@@ -51,8 +64,13 @@ function WinDetailModal({ wins, initialPosition, onClose }: { wins: any[]; initi
         .wdm-scroll::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.12); border-radius: 10px; }
         .wdm-share { transition: transform 0.15s ease, box-shadow 0.2s ease; }
         .wdm-share:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(20,19,43,0.15); }
+        @media (max-width: 520px) {
+          .wdm-modal { width: calc(100vw - 24px) !important; max-width: none !important; max-height: 92dvh !important; border-radius: 18px !important; }
+          .wdm-filters { padding-left: 16px !important; padding-right: 16px !important; flex-wrap: wrap; }
+          .wdm-scroll { padding-left: 16px !important; padding-right: 16px !important; }
+        }
       `}</style>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, width: 520, maxWidth: "94vw", maxHeight: "85vh", overflow: "hidden", animation: "wdmPop 0.3s cubic-bezier(.2,.8,.2,1)", boxShadow: "0 30px 60px rgba(20,19,43,0.3)", display: "flex", flexDirection: "column" }}>
+      <div className="wdm-modal" role="dialog" aria-modal="true" aria-label={`${m.label} wins`} onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, width: 520, maxWidth: "94vw", maxHeight: "85vh", overflow: "hidden", animation: "wdmPop 0.3s cubic-bezier(.2,.8,.2,1)", boxShadow: "0 30px 60px rgba(20,19,43,0.3)", display: "flex", flexDirection: "column" }}>
         <div style={{ background: m.grad, padding: "24px 26px", position: "relative", flexShrink: 0 }}>
           <button className="wdm-close" onClick={onClose} style={{ position: "absolute", top: 16, right: 16, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer", color: "#fff", fontSize: 14 }}>✕</button>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -64,7 +82,7 @@ function WinDetailModal({ wins, initialPosition, onClose }: { wins: any[]; initi
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, padding: "16px 26px 0", flexShrink: 0 }}>
+        <div className="wdm-filters" style={{ display: "flex", gap: 8, padding: "16px 26px 0", flexShrink: 0 }}>
           {([1, 2, 3] as const).map((f) => (
             <button key={f} className="wdm-filter" onClick={() => setFilter(f)} style={{ padding: "7px 14px", borderRadius: 20, border: "none", fontSize: 12.5, fontWeight: 700, cursor: "pointer", background: filter === f ? "linear-gradient(135deg,#6D4AFF,#8B5CF6)" : "rgba(20,19,43,0.05)", color: filter === f ? "#fff" : "rgba(20,19,43,0.6)", display: "flex", alignItems: "center", gap: 6 }}>
               <MedalIcon position={f} size={16} /> {counts[f]}
@@ -143,28 +161,30 @@ export default function WinsGrid({ wins }: { wins: any[] }) {
       <style>{`
         @keyframes winsHeroIn { from { opacity:0; transform: translateY(-10px); } to { opacity:1; transform: translateY(0); } }
         @keyframes winCardIn { from { opacity:0; transform: translateY(14px) scale(0.96); } to { opacity:1; transform: translateY(0) scale(1); } }
-        @keyframes orbFloatA { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-14px,10px) scale(1.06); } }
-        @keyframes orbFloatB { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(12px,-8px) scale(0.94); } }
-        @keyframes trophyBounce { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-4px) rotate(-6deg); } }
-        @keyframes goldShine { 0% { transform: translateX(-120%) rotate(20deg); } 100% { transform: translateX(220%) rotate(20deg); } }
-        @keyframes medalGlow { 0%,100% { filter: drop-shadow(0 0 4px var(--gc)); } 50% { filter: drop-shadow(0 0 12px var(--gc)); } }
         @keyframes pbFill { from { width: 0%; } }
         .wins-hero { animation: winsHeroIn 0.5s cubic-bezier(.2,.8,.2,1) both; }
         .rank-card { animation: winCardIn 0.45s cubic-bezier(.2,.8,.2,1) both; cursor: pointer; transition: transform 0.25s cubic-bezier(.2,.8,.2,1); }
         .rank-card:hover { transform: translateY(-6px) scale(1.02); }
-        .orb-a { animation: orbFloatA 7s ease-in-out infinite; }
-        .orb-b { animation: orbFloatB 6s ease-in-out infinite; }
-        .trophy-icon { animation: trophyBounce 2.4s ease-in-out infinite; display: inline-block; }
-        .gold-shine { position: absolute; top: -20%; left: 0; width: 40px; height: 160%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent); animation: goldShine 3.5s ease-in-out infinite; pointer-events: none; }
-        .gold-medal-emoji { animation: medalGlow 2s ease-in-out infinite; }
+        .trophy-icon { display: inline-block; }
+        .rank-card:focus-visible { outline: 3px solid rgba(109,74,255,0.45); outline-offset: 3px; }
         .streak-badge, .stat-chip { transition: transform 0.15s ease; }
         .streak-badge:hover, .stat-chip:hover { transform: scale(1.05); }
         .stats-row { animation: winCardIn 0.5s cubic-bezier(.2,.8,.2,1) 0.15s both; }
         .progress-bar-fill { animation: pbFill 1s cubic-bezier(.2,.8,.2,1) 0.3s both; }
+        @media (max-width: 600px) {
+          .wins-hero { align-items: flex-start !important; flex-wrap: wrap; padding: 20px !important; }
+          .wins-score { margin-left: 0 !important; text-align: left !important; width: 100%; }
+          .rank-grid { grid-template-columns: minmax(0,1fr) !important; }
+          .stats-row { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .wins-hero, .rank-card, .stats-row, .progress-bar-fill, .wdm-anim { animation: none !important; }
+          .rank-card, .streak-badge, .stat-chip, .wdm-filter, .wdm-row, .wdm-close, .wdm-share { transition: none !important; }
+        }
       `}</style>
 
       {/* Hero banner */}
-      <div className="wins-hero" style={{ background: "linear-gradient(120deg,#D4A017 0%,#F5C453 50%,#FDE68A 100%)", borderRadius: 20, padding: "26px 28px", marginBottom: 18, display: "flex", alignItems: "center", gap: 20, position: "relative", overflow: "hidden" }}>
+      <div className="wins-hero" style={{ background: "linear-gradient(120deg,#4C32BC 0%,#6D4AFF 55%,#8B5CF6 100%)", borderRadius: 20, padding: "26px 28px", marginBottom: 18, display: "flex", alignItems: "center", gap: 20, position: "relative", overflow: "hidden" }}>
         <div className="orb-a" style={{ position: "absolute", top: -30, right: 40, width: 130, height: 130, borderRadius: "50%", background: "rgba(255,255,255,0.18)" }} />
         <div className="orb-b" style={{ position: "absolute", bottom: -20, right: 160, width: 70, height: 70, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }} />
 
@@ -182,30 +202,30 @@ export default function WinsGrid({ wins }: { wins: any[] }) {
           </svg>
         </div>
         <div style={{ position: "relative" }}>
-          <p style={{ fontSize: 13, color: "rgba(60,40,0,0.7)", fontWeight: 700 }}>Total Victories</p>
-          <p style={{ fontFamily: "'Sora', sans-serif", fontSize: 30, fontWeight: 800, color: "#3A2A00" }}>{wins.length} Total Wins</p>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", fontWeight: 700 }}>Total Victories</p>
+          <p style={{ fontFamily: "'Sora', sans-serif", fontSize: 30, fontWeight: 800, color: "#fff" }}>{wins.length} Total Wins</p>
           <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
             {bestStreak >= 2 && (
-              <span className="streak-badge" style={{ fontSize: 11.5, fontWeight: 700, color: "#3A2A00", background: "rgba(255,255,255,0.35)", padding: "3px 10px", borderRadius: 20 }}>
+              <span className="streak-badge" style={{ fontSize: 11.5, fontWeight: 700, color: "#fff", background: "rgba(255,255,255,0.16)", padding: "3px 10px", borderRadius: 20 }}>
                 {bestStreak}x streak
               </span>
             )}
             {hasFullPodium && (
-              <span className="streak-badge" style={{ fontSize: 11.5, fontWeight: 700, color: "#3A2A00", background: "rgba(255,255,255,0.35)", padding: "3px 10px", borderRadius: 20 }}>
+              <span className="streak-badge" style={{ fontSize: 11.5, fontWeight: 700, color: "#fff", background: "rgba(255,255,255,0.16)", padding: "3px 10px", borderRadius: 20 }}>
                 Full podium
               </span>
             )}
             {thisMonthCount > 0 && (
-              <span className="streak-badge" style={{ fontSize: 11.5, fontWeight: 700, color: "#3A2A00", background: "rgba(255,255,255,0.35)", padding: "3px 10px", borderRadius: 20 }}>
+              <span className="streak-badge" style={{ fontSize: 11.5, fontWeight: 700, color: "#fff", background: "rgba(255,255,255,0.16)", padding: "3px 10px", borderRadius: 20 }}>
                 {thisMonthCount} this month
               </span>
             )}
           </div>
         </div>
 
-        <div style={{ marginLeft: "auto", textAlign: "right", position: "relative" }}>
-          <p style={{ fontSize: 11.5, color: "rgba(60,40,0,0.6)", fontWeight: 700 }}>Win Score</p>
-          <p style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 800, color: "#3A2A00" }}>{winScore}</p>
+        <div className="wins-score" style={{ marginLeft: "auto", textAlign: "right", position: "relative" }}>
+          <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>Win Score</p>
+          <p style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 800, color: "#fff" }}>{winScore}</p>
         </div>
       </div>
 
@@ -219,9 +239,9 @@ export default function WinsGrid({ wins }: { wins: any[] }) {
       ) : (
         <>
           {/* 3 rank summary cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 18, marginBottom: 20 }}>
+          <div className="rank-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 18, marginBottom: 20 }}>
             {RANK_CARDS.map((r, i) => (
-              <div key={r.pos} className="rank-card" style={{ animationDelay: `${i * 0.08}s` }} onClick={() => setDetailPos(r.pos)}>
+              <div key={r.pos} className="rank-card" role="button" tabIndex={0} aria-label={`View ${r.label} wins`} style={{ animationDelay: `${i * 0.08}s` }} onClick={() => setDetailPos(r.pos)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setDetailPos(r.pos); } }}>
                 <TiltCard
                   style={{
                     background: r.grad,
@@ -234,7 +254,6 @@ export default function WinsGrid({ wins }: { wins: any[] }) {
                     minHeight: 180,
                   }}
                 >
-                  {r.pos === 1 && <div className="gold-shine" />}
                   <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at 15% 0%, ${r.color}33, transparent 65%)`, pointerEvents: "none" }} />
                   {dominantRank === r.pos && r.count > 0 && (
                     <span style={{ position: "absolute", top: 14, right: 14, fontSize: 9.5, fontWeight: 800, color: r.color, background: "rgba(255,255,255,0.1)", padding: "3px 9px", borderRadius: 20, letterSpacing: 0.5 }}>
@@ -268,7 +287,7 @@ export default function WinsGrid({ wins }: { wins: any[] }) {
                 <span style={{ fontSize: 12, color: "rgba(20,19,43,0.45)", fontWeight: 600 }}>{wins.length}/{nextMilestone}</span>
               </div>
               <div style={{ height: 8, borderRadius: 20, background: "rgba(20,19,43,0.06)", overflow: "hidden" }}>
-                <div className="progress-bar-fill" style={{ height: "100%", width: `${Math.min((wins.length / nextMilestone) * 100, 100)}%`, borderRadius: 20, background: "linear-gradient(90deg,#D4A017,#F5C453)" }} />
+                <div className="progress-bar-fill" style={{ height: "100%", width: `${Math.min((wins.length / nextMilestone) * 100, 100)}%`, borderRadius: 20, background: "linear-gradient(90deg,#6D4AFF,#8B5CF6)" }} />
               </div>
             </div>
           )}

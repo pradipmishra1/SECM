@@ -27,25 +27,31 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
 
   useEffect(() => {
     fetch("/api/feature-flags")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Feature flags unavailable"))))
       .then((d) => {
         const flag = (d.flags || []).find((f: any) => f.key === "AI_REVIEW");
         setAiFeatureOn(!!flag?.enabled);
-      });
+      })
+      .catch(() => setAiFeatureOn(false));
     fetch("/api/subscription/status")
-      .then((r) => r.json())
-      .then((d) => setHasSubscription(!!d.active));
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Subscription status unavailable"))))
+      .then((d) => setHasSubscription(!!d.active))
+      .catch(() => setHasSubscription(false));
   }, []);
 
   async function startCheckout() {
     setPayLoading(true);
-    const res = await fetch("/api/subscription/khalti-initiate", { method: "POST" });
-    const data = await res.json();
-    setPayLoading(false);
-    if (data.paymentUrl) {
-      window.location.href = data.paymentUrl;
-    } else {
-      setError(data.error || "Could not start payment");
+    try {
+      const res = await fetch("/api/subscription/khalti-initiate", { method: "POST" });
+      const data = await res.json();
+      if (data.paymentUrl) window.location.href = data.paymentUrl;
+      else {
+        setError(data.error || "Could not start payment");
+        setPayLoading(false);
+      }
+    } catch {
+      setError("Could not start payment. Please try again.");
+      setPayLoading(false);
     }
   }
 
@@ -100,31 +106,34 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
     e.preventDefault();
     setError("");
     setLoading(true);
-
-        const res = await fetch("/api/challenges", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, type, description, rules, deadline, prizeFirst, prizeSecond, prizeThird, maxTeamSize, tags }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setLoading(false);
-      setError(data.error || "Something went wrong");
-      return;
-    }
-
-    if (criteria.length > 0 && data.challenge?.id) {
-      await fetch(`/api/challenges/${data.challenge.id}/rubric`, {
+    try {
+      const res = await fetch("/api/challenges", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ criteria }),
+        body: JSON.stringify({ title, type, description, rules, deadline, prizeFirst, prizeSecond, prizeThird, maxTeamSize, tags }),
       });
-    }
 
-    setLoading(false);
-    router.push("/dashboard/my-challenges");
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Something went wrong");
+        setLoading(false);
+        return;
+      }
+
+      if (criteria.length > 0 && data.challenge?.id) {
+        await fetch(`/api/challenges/${data.challenge.id}/rubric`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ criteria }),
+        });
+      }
+
+      setLoading(false);
+      router.push("/dashboard/my-challenges");
+    } catch {
+      setLoading(false);
+      setError("Could not create the challenge. Please check your connection and try again.");
+    }
   }
 
   const typeInfo = TYPES.find((t) => t.value === type);
@@ -142,6 +151,20 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
         .ccf-preview-card { animation: ccfFade 0.4s ease both; }
         @keyframes ccfSpin { to { transform: rotate(360deg); } }
         .ccf-spinner { animation: ccfSpin 0.7s linear infinite; }
+        .ccf-type-pill:focus-visible, .ccf-tag-remove:focus-visible, .ccf-submit-btn:focus-visible { outline: 3px solid rgba(109,74,255,0.35); outline-offset: 2px; }
+        @media (max-width: 860px) {
+          .ccf-layout { flex-direction: column !important; }
+          .ccf-preview-card { position: static !important; width: 100%; }
+        }
+        @media (max-width: 560px) {
+          .ccf-form { padding: 18px !important; }
+          .ccf-pair, .ccf-prizes { flex-direction: column !important; }
+          .ccf-pair > div, .ccf-prizes > div { width: 100%; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .ccf-type-pill, .ccf-submit-btn { transition: none !important; }
+          .ccf-tag-chip, .ccf-preview-card, .ccf-spinner { animation: none !important; }
+        }
       `}</style>
 
      <div style={{ marginBottom: 22 }}>
@@ -192,9 +215,10 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
+      <div className="ccf-layout" style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
         <form
           onSubmit={handleSubmit}
+          className="ccf-form"
           style={{
             background: "#fff",
             borderRadius: 20,
@@ -215,10 +239,12 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
             <label style={labelStyle}>Type</label>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {TYPES.map((t) => (
-                <div
+                <button
+                  type="button"
                   key={t.value}
                   className={"ccf-type-pill" + (type === t.value ? " ccf-type-active" : "")}
                   onClick={() => setType(t.value)}
+                  aria-pressed={type === t.value}
                   style={{
                     padding: "9px 14px",
                     borderRadius: 12,
@@ -230,11 +256,12 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
                     background: type === t.value ? "linear-gradient(135deg,#6D4AFF,#8B5CF6)" : "#F6F5FB",
                     color: type === t.value ? "#fff" : "#14132B",
                     border: type === t.value ? "none" : "1px solid rgba(15,23,42,0.06)",
+                    fontFamily: "inherit",
                   }}
                 >
                   <span>{t.icon}</span>
                   {t.label}
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -265,7 +292,7 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
             <p style={{ fontSize: 11, color: "rgba(20,19,43,0.35)", marginTop: 4, textAlign: "right" }}>{rules.length}/1000</p>
           </div>
 
-          <div style={{ display: "flex", gap: 12 }}>
+          <div className="ccf-pair" style={{ display: "flex", gap: 12 }}>
             <div style={{ flex: 1 }}>
               <label style={labelStyle}>Deadline</label>
               <input
@@ -294,7 +321,7 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
 
                    <div>
             <label style={labelStyle}>Prizes</label>
-            <div style={{ display: "flex", gap: 10 }}>
+            <div className="ccf-prizes" style={{ display: "flex", gap: 10 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 11, color: "rgba(20,19,43,0.4)", marginBottom: 5, display: "block" }}>🥇 1st Place</label>
                 <input className="ccf-input" style={inputStyle} value={prizeFirst} onChange={(e) => setPrizeFirst(e.target.value)} placeholder="e.g. Rs. 10,000" />
@@ -330,7 +357,7 @@ export default function CreateChallengeForm({ isVerified = false }: { isVerified
                   }}
                 >
                   {t}
-                  <span onClick={() => removeTag(t)} style={{ cursor: "pointer", fontWeight: 700 }}>×</span>
+                  <button type="button" className="ccf-tag-remove" aria-label={`Remove ${t} tag`} onClick={() => removeTag(t)} style={{ cursor: "pointer", fontWeight: 700, border: 0, background: "transparent", color: "inherit", padding: 0, fontSize: "inherit" }}>×</button>
                 </span>
               ))}
             </div>

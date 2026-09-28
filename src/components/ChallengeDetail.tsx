@@ -53,19 +53,20 @@ export default function ChallengeDetail({
     <div style={{ animation: "scF 0.4s cubic-bezier(.2,.8,.2,1)" }}>
       <style>{`
         @keyframes scF { from { opacity:0; transform: translateY(10px);} to { opacity:1; transform: translateY(0);} }
-        @keyframes popIn { from { opacity:0; transform: scale(0.9);} to { opacity:1; transform: scale(1);} }
+        @media (max-width: 760px) { .challenge-head { flex-direction: column; } .challenge-actions { flex-wrap: wrap; } .challenge-columns { flex-direction: column; align-items: stretch !important; } .challenge-columns > div { flex: initial !important; width: 100%; } }
+        @media (prefers-reduced-motion: reduce) { .challenge-enter, .challenge-pop { animation: none !important; } .sec-card, .sec-btn { transition: none !important; } }
         .sec-card:hover { box-shadow: 0 8px 24px rgba(15,23,42,0.06); transform: translateY(-2px); }
         .sec-btn { transition: transform 0.15s ease, box-shadow 0.25s ease, opacity 0.2s ease; }
         .sec-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(109,74,255,0.3); }
         .sec-btn:active:not(:disabled) { transform: translateY(0); }
       `}</style>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
-        <div style={{ animation: "popIn 0.35s ease" }}>
+      <div className="challenge-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, gap: 20 }}>
+        <div className="challenge-pop" style={{ animation: "scF 0.35s ease" }}>
           <div style={{ marginBottom: 10 }}>
             <TypeBadge type={challenge.type} />
           </div>
-          <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 27, fontWeight: 700, color: "#14132B" }}>
+          <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: "clamp(24px, 4vw, 32px)", fontWeight: 700, color: "#14132B", overflowWrap: "anywhere" }}>
             {challenge.title}
           </h1>
           <p style={{ color: "rgba(20,19,43,0.5)", fontSize: 14, marginTop: 4 }}>
@@ -73,7 +74,7 @@ export default function ChallengeDetail({
           </p>
         </div>
 
-        <div style={{ animation: "popIn 0.4s ease" }}>
+        <div className="challenge-actions" style={{ animation: "scF 0.4s ease", minWidth: 0 }}>
                     {role === "STUDENT" &&
             (optimisticJoined || myTeam ? (
               <span
@@ -137,8 +138,8 @@ export default function ChallengeDetail({
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 18 }}>
-        <div style={{ flex: 2, display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="challenge-columns" style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
+        <div style={{ flex: 2, minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="sec-card" style={{ ...cardStyle, animation: "scF 0.4s ease 0.05s both" }}>
             <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 700, color: "#14132B", marginBottom: 10 }}>
               Description
@@ -179,7 +180,7 @@ export default function ChallengeDetail({
           )}
         </div>
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="sec-card" style={{ ...cardStyle, padding: 18, animation: "scF 0.4s ease 0.08s both" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <Icon.clock width={15} height={15} style={{ color: "#6D4AFF" }} />

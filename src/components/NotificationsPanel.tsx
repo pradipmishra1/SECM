@@ -26,21 +26,28 @@ const TYPE_ICONS: Record<string, string> = {
   NEW_FOLLOWER: "⭐",
 };
 
-export default function NotificationsPanel() {  const router = useRouter();
+export default function NotificationsPanel() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  function load() {
-    fetch("/api/notifications")
-      .then((r) => r.json())
-      .then((d) => {
-        setNotifications(d.notifications || []);
-        setUnreadCount(d.unreadCount || 0);
-        setLoading(false);
-      });
+  async function load() {
+    try {
+      const response = await fetch("/api/notifications");
+      if (!response.ok) throw new Error("Unable to load notifications.");
+      const data = await response.json();
+      setNotifications(data.notifications || []);
+      setUnreadCount(data.unreadCount || 0);
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
    useEffect(() => {
@@ -61,13 +68,17 @@ export default function NotificationsPanel() {  const router = useRouter();
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  async function handleOpen() {
+  function handleOpen() {
     setOpen((prev) => !prev);
   }
 
   async function handleNotificationClick(n: any) {
     if (!n.isRead) {
-      await fetch(`/api/notifications/${n.id}`, { method: "PATCH" });
+      try {
+        await fetch(`/api/notifications/${n.id}`, { method: "PATCH" });
+      } catch {
+        // Keep navigation available if marking the item read fails.
+      }
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
       setUnreadCount((prev) => Math.max(0, prev - 1));
     }
@@ -76,7 +87,12 @@ export default function NotificationsPanel() {  const router = useRouter();
   }
 
   async function markAllRead() {
-    await fetch("/api/notifications/mark-all-read", { method: "PATCH" });
+    try {
+      const response = await fetch("/api/notifications/mark-all-read", { method: "PATCH" });
+      if (!response.ok) return;
+    } catch {
+      return;
+    }
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     setUnreadCount(0);
   }
@@ -85,20 +101,21 @@ export default function NotificationsPanel() {  const router = useRouter();
     <div ref={ref} style={{ position: "relative" }}>
       <style>{`
         @keyframes nbPop { from { opacity:0; transform: translateY(-8px) scale(0.96); } to { opacity:1; transform: translateY(0) scale(1); } }
-        @keyframes nbPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
         .nb-btn { transition: background 0.15s ease; }
         .nb-btn:hover { background: rgba(109,74,255,0.08) !important; }
         .nb-item { transition: background 0.15s ease; cursor: pointer; }
         .nb-item:hover { background: #F6F5FB !important; }
-        .nb-dot { animation: nbPulse 1.8s ease-in-out infinite; }
         .nb-panel { animation: nbPop 0.18s cubic-bezier(.2,.8,.2,1); }
         .nb-mark-all { transition: opacity 0.15s ease; }
         .nb-mark-all:hover { opacity: 0.7; }
+        @media (prefers-reduced-motion: reduce) { .nb-btn, .nb-item, .nb-panel, .nb-mark-all { animation: none; transition: none; } }
       `}</style>
 
       <button
         className="nb-btn"
         onClick={handleOpen}
+        aria-label="Notifications"
+        aria-expanded={open}
         style={{
           position: "relative",
           width: 38,
@@ -149,7 +166,7 @@ export default function NotificationsPanel() {  const router = useRouter();
             position: "absolute",
             top: 46,
             right: 0,
-            width: 340,
+            width: "min(340px, calc(100vw - 24px))",
             maxHeight: 420,
             background: "#fff",
             borderRadius: 16,
@@ -177,6 +194,8 @@ export default function NotificationsPanel() {  const router = useRouter();
           <div style={{ overflowY: "auto", flex: 1 }}>
             {loading ? (
               <div style={{ padding: 30, textAlign: "center", fontSize: 13, color: "rgba(20,19,43,0.4)" }}>Loading...</div>
+            ) : loadError ? (
+              <div role="status" style={{ padding: 32, textAlign: "center", fontSize: 13, color: "rgba(20,19,43,0.48)" }}>Notifications are temporarily unavailable.</div>
             ) : notifications.length === 0 ? (
               <div style={{ padding: 40, textAlign: "center" }}>
                 <div style={{ fontSize: 26, marginBottom: 8, opacity: 0.3 }}>🔔</div>

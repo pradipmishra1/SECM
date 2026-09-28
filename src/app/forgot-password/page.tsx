@@ -28,7 +28,14 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="auth-body">
+    <div className="auth-body forgot-password-page">
+      <style>{`
+        .forgot-password-page .forgot-email:focus { border-color: #6D4AFF !important; box-shadow: 0 0 0 4px rgba(109,74,255,0.1); }
+        .forgot-password-page .forgot-submit { background: linear-gradient(135deg,#6D4AFF,#8B5CF6) !important; box-shadow: 0 8px 22px rgba(109,74,255,0.2); transition: transform 0.18s ease, box-shadow 0.18s ease; }
+        .forgot-password-page .forgot-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(109,74,255,0.28); }
+        .forgot-password-page .forgot-submit:focus-visible { outline: 3px solid #8B5CF6; outline-offset: 3px; }
+        @media (prefers-reduced-motion: reduce) { .forgot-password-page .auth-card, .forgot-password-page .forgot-submit { animation: none !important; transition: none !important; } }
+      `}</style>
       <div className="auth-card" style={{ maxWidth: 420 }}>
         <div className="auth-brand">
           <LogoMark size={38} />
@@ -52,8 +59,10 @@ export default function ForgotPasswordPage() {
             </p>
 
             <form onSubmit={handleSubmit}>
-              <label style={{ fontSize: 12.5, fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>Email</label>
+              <label htmlFor="forgot-email" style={{ fontSize: 12.5, fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>Email</label>
               <input
+                id="forgot-email"
+                className="forgot-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -79,6 +88,7 @@ export default function ForgotPasswordPage() {
 
               <button
                 type="submit"
+                className="forgot-submit"
                 disabled={loading}
                 style={{
                   width: "100%",
