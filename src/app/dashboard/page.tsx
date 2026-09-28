@@ -120,7 +120,11 @@ const getStudentData = cache(async (userId: string) => {
       where: { userId },
       select: { challengeId: true },
     }),
-    prisma.team.count({ where: { leaderId: userId } }),
+    prisma.team.count({
+      where: {
+        OR: [{ leaderId: userId }, { members: { some: { userId } } }],
+      },
+    }),
     prisma.submission.count({ where: { userId } }),
     prisma.winner.count({ where: { submission: { userId } } }),
     prisma.studentProfile.findUnique({ where: { userId }, select: { skills: true, interests: true } }),
