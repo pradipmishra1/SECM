@@ -117,7 +117,10 @@ export default function AdminAllChallenges() {
     if (isRetry) setRefreshing(true);
     setLoadError(false);
     fetch("/api/admin/challenges")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Request failed");
+        return r.json();
+      })
       .then((d) => {
         setChallenges(d.challenges || []);
         setLastUpdated(new Date());
