@@ -1,12 +1,5 @@
 import { prisma } from "@/lib/prisma";
-
-type NotificationType =
-  | "TEAM_INVITE"
-  | "TEAM_INVITE_ACCEPTED"
-  | "SUBMISSION_REVIEWED"
-  | "WINNER_ANNOUNCED"
-  | "ORGANIZER_VERIFIED"
-  | "ACCOUNT_STATUS_CHANGE";
+import type { NotificationType } from "@prisma/client";
 
 export async function createNotification({
   userId,

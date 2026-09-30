@@ -610,17 +610,17 @@ export function ProfileContent({ profile, onClose, fullPage = false }: { profile
   );
 }
 
-function StatBox({ label, value }: { label: string; value: number }) {
+function StatBox({ label, value, icon }: { label: string; value: number; icon?: string }) {
   return (
     <div className="p-stat" style={{ flex: 1, background: "#F6F5FB", borderRadius: 14, padding: "14px 8px", textAlign: "center" }}>
+      {icon && <div style={{ fontSize: 15, marginBottom: 2 }}>{icon}</div>}
       <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 700, color: "#14132B", fontVariantNumeric: "tabular-nums" }}>{value}</div>
       <div style={{ fontSize: 11, color: "rgba(20,19,43,0.45)", marginTop: 3 }}>{label}</div>
     </div>
   );
 }
 
-
-function FollowStatBox({ label, value, onClick }: { label: string; value: number; onClick?: () => void }) {
+function FollowStatBox({ label, value, icon, onClick }: { label: string; value: number; icon?: string; onClick?: () => void }) {
   return (
     <div
       className="p-stat"
@@ -634,6 +634,7 @@ function FollowStatBox({ label, value, onClick }: { label: string; value: number
         cursor: onClick ? "pointer" : "default",
       }}
     >
+      {icon && <div style={{ fontSize: 15, marginBottom: 2 }}>{icon}</div>}
       <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 700, color: "#14132B", fontVariantNumeric: "tabular-nums" }}>
         {value}
       </div>
